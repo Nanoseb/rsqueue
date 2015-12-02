@@ -1,0 +1,440 @@
+#!/bin/bash
+# rsqueue: v2.0.6
+# Script used to monitor jobs and refresco running instances more particularly
+# For Marclus3 and Marclus4
+# by Sebastien Lemaire <slemaire@ec-lyon.fr>
+# license MIT
+
+allparams="-u -t -p -i"
+defaultparams="-i"
+
+
+man_sub () {
+    echo -e "Usage: rsqueue [OPTIONS]
+    -i              Print detailed info about refresco job (default behaviour)
+                        A \"\e[31m!\e[0m\" will appear near the \"Iterations\" column if the calculation is not converging
+                        The time left will turn red if the runtime specified in the jobfile is not long enough
+    -u ([users])    Print job info of all users (default) or from a comma separated list of users
+    -t / --top      Equivalent of slurmtop to summarize cluster load
+    -p              Print info about partitions usage
+    -c              Count the number of core used per user
+    -d [jobID]      Print the working directory of the specified JobID
+    -s              Don't print the storage needed for simulations
+    -r              Print only running jobs
+    --st            Sort job list by start time
+    --pn            Don't print the project number in the job name
+    -a / --all      Print (almost) everything (equivalent of: rsqueue $allparams)
+    -h / --help     Print this help"
+}
+
+
+convert_human() {
+    awk '{ sum=$1 ; hum[1024**3]="T";hum[1024**2]="G";hum[1024]="M"; for (x=1024**3; x>=1024; x/=1024){ if (sum>=x) { printf "%.1f%s\n",sum/x,hum[x];break } }}' <<<"$1"
+}
+
+main_sub () {
+
+    if [ "$strg" = 1 ]
+    then
+        if [ "$marclus" = 4 ]
+        then
+            printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-13s %-20s %-20s %s\n"\
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
+            printf "%167s \n" "" | sed 's/\ /-/g'
+        else
+            printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-20s %-20s %s\n"\
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Start time" "ETA" "Time left"
+            printf "%153s \n" "" | sed 's/\ /-/g'
+        fi
+    else
+        if [ "$marclus" = 4 ]
+        then
+            printf "%-15s %-16s %-9s %-8s %-15s %-5s %-9s %-14s %-20s %-20s %s\n"\
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
+            printf "%156s \n" "" | sed 's/\ /-/g'
+        else
+            printf "%-15s %-16s %-9s %-8s %-15s %-5s %-10s %-20s %-20s %s\n"\
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Start time" "ETA" "Time left"
+            printf "%142s \n" "" | sed 's/\ /-/g'
+        fi
+    fi
+
+    ETA24hsize=0
+    ETAsizetotal=0
+    currentsizetotal=0
+    nowepoch=$(date +%s)
+
+    while read line;
+    do
+        [ ! "$line" ] && echo "No job" && strg=0 && continue
+
+        jobstate=$(awk '{print $1}' <<<$line)
+        jobid=$(awk '{print $2}' <<<$line)
+        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
+        jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobname=$(grep -m 1 "^Name=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
+        jobtime=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"T" '{print $3}' | sed 's/:..$//')
+
+        #jobfile=$(grep -m 1 "^Command=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        dirp=$(awk -F"/" '{print $NF}' <<<"$dir")
+
+        if [ "$project_number" = 1 ]
+        then
+            jobname_short=$jobname
+        else
+            jobname_short=$(sed 's/^[^_]*_//' <<<"$jobname")
+        fi
+
+        [ -d "$dir" ] || continue
+        controls="$dir"/controls.xml
+        residuals="$dir"/residuals.dat
+
+
+        isrefresco="y"
+        [ "$jobstate" = "RUNNING" ] && isrefresco=$(head -n 3 "$jobout" | grep -m 1 "^# ReFRESCO ")
+
+        if [ "$jobstate" = "RUNNING" ] && [ -e "$controls" ] && [ -e "$residuals" ] && [ "$isrefresco" ]
+        then
+
+            mem_s=$(convert_human "$(sstat -n --format=AveVMSize -j $jobid | sed 's/K//')")
+            outerwarn=""
+            initialtimestep=0
+            unsteady=$(xmllint --shell "$controls" <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
+            if [ "$unsteady" ]
+            then
+                currentstep=$(tail -n 1 "$residuals" | awk '{print $2}' | sed 's/[^0-9]//g')
+                maxtimestep=$(xmllint --shell "$controls" <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
+
+                boolrestart=$(xmllint --shell "$controls" <<<'cat //controls/restart/restart' | grep -m 1 true)
+                boolresetcount=$(xmllint --shell "$controls" <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
+                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell "$controls" <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
+
+                outermax=$(xmllint --shell "$controls" <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
+                outercurrent=$(tail -n 1 "$residuals" | awk '{print $3}')
+                [ "$outermax" = "$outercurrent" ] && outerwarn="!"
+            else
+                currentstep=$(tail -n 1 "$residuals" | awk '{print $1}' | sed 's/[^0-9]//g')
+                maxtimestep=$(xmllint --shell "$controls" <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
+            fi
+
+            initialtimestepf=$(head -n 3 "$residuals" | sed '3!d' | awk '{print $2}')
+            [ -z "$initialtimestepf" ] && initialtimestepf=$initialtimestep
+
+            [ -z "$currentstep" ] && currentstep=$(bc <<<"$initialtimestep +1")
+            [ "$currentstep" = "$initialtimestepf" ] && currentstep=$(bc <<<"$initialtimestepf +1")
+
+            #jobdate=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $3}' | sed 's/\./\//g') 
+            #jobtime=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $4}')
+
+            jobtimelimit=$(grep -m 1 "^TimeLimit=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/-/:/' | sed 's/^\(..:..:..\)$/0:\1/' | awk -F":" '{print $4+$3*60+$2*3600+$1*86400}')
+            startday=$(awk -F"/" '{print $3 "/" $2 "/" $1}' <<<$jobdate)
+            starthour=$jobtime
+            startepoch=$(date -d "$startday $starthour" +%s)
+            ETAepoch=$(bc <<<"$nowepoch + ($maxtimestep - $currentstep)*($nowepoch - $startepoch)/($currentstep-$initialtimestep)")
+            ETAdate=$(date -d @$ETAepoch +%d/%m/%Y\ %H:%M)
+            ETAsl=$((ETAepoch - nowepoch))
+
+            if [ $((ETAsl - 90000 )) -lt 0 ]
+            then
+                ETAtime=$(echo 0$(bc <<<"$ETAsl/3600"):0$(bc <<<"($ETAsl%3600)/60") | sed 's/:0\(..\)$/:\1/;s/^0\(..\):/\1:/')
+            else
+                ETAtimes=$((ETAsl -90000))
+                ETAday=$(date -d @$ETAtimes +%j)
+                if [ "$ETAday" -gt 50 ]
+                then
+                    ETAtime=$(echo $(bc <<<"$ETAday/30") months $(bc <<<"$ETAday%30") days | sed 's/\ 0\ ....$//;s/\ 1\ ..../\ 1\ day/;s/^1\ ....../1\ month/')
+                else
+                    ETAtime=$(echo $ETAday days $(date -d @$ETAtimes +%H:%M) | sed 's/^0*//;s/^\ ....//;s/^1\ ..../1\ day/')
+                fi
+            fi
+
+            colortime=""
+            [ "$ETAepoch" ] && [ "$((startepoch + jobtimelimit))" -lt "$ETAepoch" ] && colortime='\e[31m'
+
+            percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
+
+            costETA=$(bc <<<"0.05*$jobcore*($ETAepoch-$startepoch)/3600")
+            costnow=$(bc <<<"0.05*$jobcore*($nowepoch-$startepoch)/3600")
+
+            if [ "$strg" = "1" ]
+            then
+                nowsize=$(du -s "$dir" | awk '{print $1}')
+                ETAsize=$(bc <<<"($maxtimestep - $currentstep)*($nowsize)/($currentstep-$initialtimestepf)")
+                ETAsizeh=$(convert_human $(bc <<<"$ETAsize+$nowsize"))
+                nowsizeh=$(convert_human $nowsize)
+                ETAsizetotal=$((nowsize + ETAsize + ETAsizetotal))
+                currentsizetotal=$((nowsize + currentsizetotal))
+                ETA24hsize=$(bc <<<"$ETA24hsize + 86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
+
+
+                if [ "$marclus" = "4" ]
+                then
+
+                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %5s/%5s € %3s %s %-8s %b %-20s %s \e[0m\n" \
+                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
+                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "$costnow" "$costETA"\
+                        "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                else
+                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %3s %s %-8s %b %-20s %s \e[0m\n" \
+                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
+                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                fi
+
+            else
+
+                if [ "$marclus" = "4" ]
+                then
+                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %5s/%5s € %4s %s %-8s %b %-20s %s \e[0m\n" \
+                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
+                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "$costnow" "$costETA" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                else
+                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %4s %s %-8s %b %-20s %s \e[0m\n" \
+                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
+                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                fi
+            fi
+
+        else 
+            refresco=""
+            [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
+            colorpd=""
+            [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
+
+            if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
+            then
+                if [ "$strg" = 1 ]
+                then
+                    if [ "$marclus" = "4" ]
+                    then
+                        printf "%b%-15s %-16s %-9s %-5s %11s %59s %-9s %s \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                    else
+                        printf "%b%-15s %-16s %-9s %-5s %11s %45s %-9s %s \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                    fi
+
+                else
+
+                    if [ "$marclus" = "4" ]
+                    then
+                        printf "%b%-15s %-16s %-9s %-5s %11s %48s %-9s %s \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                    else
+                        printf "%b%-15s %-16s %-9s %-5s %11s %34s %-9s %s \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                    fi
+
+                fi
+            fi
+        fi
+    done <<<"$(squeue -S i -h -u $USER -o "%T %i")"
+
+}
+
+storage_sub () {
+    echo
+    echo Total disk space needed: $(convert_human $ETAsizetotal)
+    [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
+    echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
+    [ "$marclus" = 3 ] && quota -sw | tail -n 1 | awk '{print "quota: " $2 "/" $3}'
+}
+
+
+count_sub () {
+    echo -e "\e[34m\e[4mUsed CPUs per user:\e[0m"
+    list=$(squeue -t R -h -o "%u %C")
+    users_c=$(awk '{print $1}' <<<"$list" | sort | uniq)
+    used_core=$(awk '{s+=$2} END {print s}' <<<"$list")
+    nb_user=$(squeue -h -o  "%u" | sort -u | wc -l)
+    avg=$(bc <<<"$used_core / $nb_user")
+
+    while read user
+    do
+        nb=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
+        if [ "$nb" -gt "$avg" ]
+        then
+            echo -e "$user: \e[31m$nb\e[0m"
+        else
+            echo -e "$user: $nb"
+        fi
+    done <<<"$users_c" | column -t
+}
+
+
+top_sub () {
+
+    list=$(squeue -t R -h -o "%u %D %C %P")
+    users_t=$(awk '{print $1}' <<<"$list" | sort -u)
+    echo "USER NB_JOBS NB_NODES NB_CPUS PARTITIONS"
+    while read user
+    do
+        nbjob=$(grep ^$user\  <<<"$list" | wc -l)
+        core=$(grep ^$user\  <<<"$list" | awk '{s+=$3} END {print s}')
+        node=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
+        partition=$(grep ^$user\  <<<"$list" | awk '{print $4}' | sort -u | tr '\n' ',' | sed 's/,$//')
+        echo $user $nbjob $node $core $partition
+
+    done <<<"$users_t" | sort -n -k 4 -r
+
+    if [ "$runonly" = "0" ]
+    then
+        list=$(squeue -t PD -h -o "%u %D %C %P")
+        users_t=$(awk '{print $1}' <<<"$list" | sort -u)
+        while read user
+        do
+            nbjob=$(grep ^$user\  <<<"$list" | wc -l)
+            core=$(grep ^$user\  <<<"$list" | awk '{s+=$3} END {print s}')
+            node=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
+            partition=$(grep ^$user\  <<<"$list" | awk '{print $4}' | sort -u | tr '\n' ',' | sed 's/,$//')
+            echo "$user $nbjob pending $core $partition"
+
+        done <<<"$users_t" | sort -n -k 4 -r  
+    fi
+
+}
+
+
+wdir_sub () {
+    [ -z $jobid_d ] && echo "No jobID" && exit 1
+    jobinfo=$(scontrol show job $jobid_d | sed 's/ /\n/g')
+    dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+    echo $dir
+}
+
+
+userl_sub () {
+    arg=''
+    [ "$users" ] && arg="-u $users"
+    [ "$runonly" = "1" ] && arg="$arg -t R"
+    result=$(squeue $arg -S $sort -o "%8i %5Q %9P %14u %30j %8T %20S %.12l %.12L %.6C" | \
+        sed -r 's/([0-9])T([0-9])/\1\ \2/;s/:[0-9]*\ /\ \ \ \ /;s/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2\x1b[0m/')
+    if [ "$project_number" = 1 ]
+    then
+        echo -e "$result"
+    else
+        echo -e "$result" | sed -r 's/P[0-9]{5}\.[0-9]{3}//;s/\ _/\ \ /;s/NAME(\ ){11}/\ NAME/'
+    fi
+}
+
+
+partition_sub () {
+    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n", 
+    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
+}
+
+
+marclus=$(hostname | cut -c8)
+strg=1
+runonly=0
+project_number=1
+sort="-T,u,i"
+
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        -i)
+            params="$params -i"
+            shift
+            ;;
+        -s)
+            strg=0
+            shift
+            ;;
+        -r)
+            runonly=1
+            shift
+            ;;
+        -c)
+            params="$params -c"
+            shift
+            ;;
+        -d)
+            shift
+            jobid_d="$1"
+            wdir_sub
+            exit 0
+            ;;
+        -u)
+            if [ -n "$2" ] && [ "${2:0:1}" = "-" ]
+            then
+                users=""
+            else
+                shift
+                users="$1"
+            fi
+            params="$params -u"
+            shift
+            ;;
+        -t|--top)
+            params="$params -t"
+            shift
+            ;;
+        --pn)
+            project_number=0
+            shift
+            ;;
+        -a|--all)
+            params="$params -a"
+            shift
+            ;;
+        --st)
+            sort="S,-Q"
+            shift
+            ;;  
+        -p)
+            params="$params -p"
+            shift
+            ;;
+        -h|--help)
+            man_sub
+            exit 0
+            ;;
+        -4) #for debug only
+            marclus=4
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            man_sub
+            exit 1
+            ;;
+    esac
+done
+
+
+if [ -z "$params" ] 
+then
+    params=$defaultparams
+fi
+
+if [ "$(grep '\-a' <<<"$params")" ]
+then
+    params=$allparams
+fi
+
+
+for param in $params 
+do
+    case $param in
+        -i) main_sub 
+            [ $strg = 1 ] && storage_sub
+            ;;
+        -c) count_sub
+            ;;
+        -d) wdir_sub
+            ;;
+        -t) top_sub  | column -t  | sed -r 's/^(.*)pending(.*)$/\x1b[2m\1pending\2\x1b[0m/'
+            ;;
+        -u) userl_sub
+            ;;
+        -p) partition_sub
+            ;;
+    esac
+    echo
+done
+
+# vim: ai ts=4 sw=4 et sts=4 ft=sh
