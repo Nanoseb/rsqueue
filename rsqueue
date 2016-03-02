@@ -77,8 +77,8 @@ main_sub () {
         jobtime=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"T" '{print $3}' | sed 's/:..$//')
 
         #jobfile=$(grep -m 1 "^Command=" <<<"$jobinfo" | awk -F"=" '{print $2}')
-        jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | awk -F"=" '{print $2}')
-        dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/[^=]*=//')
+        dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/[^=]*=//')
         dirp=$(awk -F"/" '{print $NF}' <<<"$dir")
 
         if [ "$project_number" = 1 ]
@@ -94,7 +94,7 @@ main_sub () {
 
 
         isrefresco="y"
-        [ "$jobstate" = "RUNNING" ] && isrefresco=$(head -n 3 "$jobout" | grep -m 1 "^# ReFRESCO ")
+        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout")
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controls" ] && [ -e "$residuals" ] && [ "$isrefresco" ]
         then
@@ -111,6 +111,8 @@ main_sub () {
                 boolrestart=$(xmllint --shell "$controls" <<<'cat //controls/restart/restart' | grep -m 1 true)
                 boolresetcount=$(xmllint --shell "$controls" <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
                 [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell "$controls" <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
+
+                [ ! "$initialtimestep" ] && initialtimestep=0
 
                 outermax=$(xmllint --shell "$controls" <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
                 outercurrent=$(tail -n 1 "$residuals" | awk '{print $3}')
@@ -230,7 +232,7 @@ main_sub () {
                 fi
             fi
         fi
-    done <<<"$(squeue -S i -h -u $USER -o "%T %i")"
+    done <<<"$(squeue -S $sort -h -u $USER -o "%T %i")"
 
 }
 
