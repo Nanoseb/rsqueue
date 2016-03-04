@@ -1,5 +1,5 @@
 #!/bin/bash
-# rsqueue: v2.0.6
+# rsqueue: v2.0.8
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <slemaire@ec-lyon.fr>
@@ -95,11 +95,15 @@ main_sub () {
 
         isrefresco="y"
         [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout")
+        
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controls" ] && [ -e "$residuals" ] && [ "$isrefresco" ]
         then
 
-            mem_s=$(convert_human "$(sstat -n --format=AveVMSize -j $jobid | sed 's/K//')")
+            mem=$(sstat -n --format=AveVMSize -j $jobid 2> /dev/null)
+            [ $? == 0 ] || mem=0
+            mem_s=$(convert_human "$(sed 's/K//' <<<"$mem")")
+
             outerwarn=""
             initialtimestep=0
             unsteady=$(xmllint --shell "$controls" <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
