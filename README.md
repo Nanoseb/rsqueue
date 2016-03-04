@@ -53,3 +53,10 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
     <td>Print this help"</td>
   </tr>
 </table>
+
+
+
+
+# Rqstat
+
+Equivalent of rsqueue for PBS/Torque clusters, this version is developed for Iridis4 (University of Southampton).
