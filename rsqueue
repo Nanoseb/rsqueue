@@ -78,14 +78,15 @@ main_sub () {
         jobid=$(awk '{print $2}' <<<$line)
         jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
-        jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
         jobtime=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"T" '{print $3}' | sed 's/:..$//')
 
         #jobfile=$(grep -m 1 "^Command=" <<<"$jobinfo" | awk -F"=" '{print $2}')
-        jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/[^=]*=//')
-        dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/[^=]*=//')
-        dirp=$(awk -F"/" '{print $NF}' <<<"$dir")
+        jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
+        dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
+        dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
+        # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
 
         if [ "$project_number" = 1 ]
         then
@@ -93,7 +94,7 @@ main_sub () {
         else
             jobname_short=$(sed 's/^[^_]*_//' <<<"$jobname")
         fi
-
+ 
         [ -d "$dir" ] || continue
         controls="$dir"/controls.xml
         residuals="$dir"/residuals.dat
@@ -179,7 +180,6 @@ main_sub () {
                 nowsizeh=$(convert_human $nowsize)
                 ETAsizetotal=$((nowsize + ETAsize + ETAsizetotal))
                 currentsizetotal=$((nowsize + currentsizetotal))
-                ETA24hsizejob=$(bc <<<"86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
                 if [[ $ETAday -ge 1 ]]
                 then
                     ETA24hsize=$(bc <<<"$ETA24hsize + 86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
@@ -289,10 +289,11 @@ top_sub () {
     echo "USER NB_JOBS NB_NODES NB_CPUS PARTITIONS"
     while read user
     do
-        nbjob=$(grep ^$user\  <<<"$list" | wc -l)
-        core=$(grep ^$user\  <<<"$list" | awk '{s+=$3} END {print s}')
-        node=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
-        partition=$(grep ^$user\  <<<"$list" | awk '{print $4}' | sort -u | tr '\n' ',' | sed 's/,$//')
+        userlist=$(grep ^$user\  <<<"$list")
+        nbjob=$(wc -l <<<"$userlist")
+        core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
+        node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+        partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
         echo $user $nbjob $node $core $partition
 
     done <<<"$users_t" | sort -n -k 4 -r
@@ -303,10 +304,11 @@ top_sub () {
         users_t=$(awk '{print $1}' <<<"$list" | sort -u)
         while read user
         do
-            nbjob=$(grep ^$user\  <<<"$list" | wc -l)
-            core=$(grep ^$user\  <<<"$list" | awk '{s+=$3} END {print s}')
-            node=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
-            partition=$(grep ^$user\  <<<"$list" | awk '{print $4}' | sort -u | tr '\n' ',' | sed 's/,$//')
+            userlist=$(grep ^$user\  <<<"$list")
+            nbjob=$(wc -l <<<"$userlist")
+            core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
+            node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+            partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
             echo "$user $nbjob pending $core $partition"
 
         done <<<"$users_t" | sort -n -k 4 -r  
@@ -322,7 +324,7 @@ wdir_sub () {
         [ -z $jobid_d ] && echo "No jobID" && exit 1
     fi
     jobinfo=$(scontrol show job $jobid_d | sed 's/ /\n/g')
-    dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+    dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
     echo $dir
 }
 
