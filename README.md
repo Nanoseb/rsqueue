@@ -50,7 +50,7 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
   </tr>
   <tr>
     <td>-h / --help</td>
-    <td>Print this help"</td>
+    <td>Print this help</td>
   </tr>
 </table>
 
@@ -60,3 +60,6 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
 # Rqstat
 
 Equivalent of rsqueue for PBS/Torque clusters, this version is developed for Iridis4 (University of Southampton).
+
+# Other
+If you adapt this script for an other cluster please send it to me so that I can make it available for everyone
