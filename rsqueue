@@ -1,8 +1,8 @@
 #!/bin/bash
-# rsqueue: v2.0.8
+# rsqueue: v2.0.9
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
-# by Sebastien Lemaire <slemaire@ec-lyon.fr>
+# by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
 
 allparams="-u -t -p -i"
@@ -32,6 +32,10 @@ convert_human() {
     awk '{ sum=$1 ; hum[1024**3]="T";hum[1024**2]="G";hum[1024]="M"; for (x=1024**3; x>=1024; x/=1024){ if (sum>=x) { printf "%.1f%s\n",sum/x,hum[x];break } }}' <<<"$1"
 }
 
+gen_line() {
+    printf "%${1}s \n" "" | sed 's/\ /─/g'
+}
+
 main_sub () {
     
     # Header
@@ -41,22 +45,22 @@ main_sub () {
         then
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-13s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
-            printf "%167s \n" "" | sed 's/\ /-/g'
+            gen_line 167
         else
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Start time" "ETA" "Time left"
-            printf "%153s \n" "" | sed 's/\ /-/g'
+            gen_line 153
         fi
     else
         if [ "$marclus" = 4 ]
         then
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-9s %-14s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
-            printf "%156s \n" "" | sed 's/\ /-/g'
+            gen_line 156
         else
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-10s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Start time" "ETA" "Time left"
-            printf "%142s \n" "" | sed 's/\ /-/g'
+            gen_line 142
         fi
     fi
 
@@ -69,6 +73,7 @@ main_sub () {
     do
         [ ! "$line" ] && echo "No job" && strg=0 && continue
 
+        # Gathering of job metadata
         jobstate=$(awk '{print $1}' <<<$line)
         jobid=$(awk '{print $2}' <<<$line)
         jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
@@ -253,7 +258,6 @@ storage_sub () {
     echo Total disk space needed: $(convert_human $ETAsizetotal)
     [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
-    # [ "$marclus" = 3 ] && quota -sw | tail -n 1 | awk '{print "quota: " $2 "/" $3}'
 }
 
 
@@ -312,7 +316,11 @@ top_sub () {
 
 
 wdir_sub () {
-    [ -z $jobid_d ] && echo "No jobID" && exit 1
+    if [ -z $jobid_d ] 
+    then
+        jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
+        [ -z $jobid_d ] && echo "No jobID" && exit 1
+    fi
     jobinfo=$(scontrol show job $jobid_d | sed 's/ /\n/g')
     dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | awk -F"=" '{print $2}')
     echo $dir
