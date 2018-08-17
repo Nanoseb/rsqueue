@@ -45,6 +45,10 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
     <td>Don't print the project number in the job name</td>
   </tr>
   <tr>
+    <td>-f / --follow ([time])</td>
+    <td>Refresh the your job list every [time]s (default being 15s)</td>
+  </tr>
+  <tr>
     <td>-a / --all</td>
     <td>Print (almost) everything (equivalent of: rsqueue -u -t -p -i)</td>
   </tr>
