@@ -23,6 +23,7 @@ man_sub () {
     -r                       Print only running jobs
     --st                     Sort job list by start time
     --pn                     Don't print the project number in the job name
+    --stop [jobID]           Writes a stopfile in the computation working directory to cleanly stop the simulation
     -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
     -a / --all               Print (almost) everything (equivalent of: rsqueue $allparams)
     -h / --help              Print this help"
@@ -80,7 +81,7 @@ main_sub () {
         # Gathering of job metadata
         jobstate=$(awk '{print $1}' <<<$line)
         jobid=$(awk '{print $2}' <<<$line)
-        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
+        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g') 
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
@@ -329,8 +330,8 @@ wdir_sub () {
         jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
         [ -z $jobid_d ] && echo "No jobID" && exit 1
     fi
-    jobinfo=$(scontrol show job $jobid_d | sed 's/ /\n/g')
-    dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
+    dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
+    [ -z "$dir" ] && echo . && exit 1
     echo $dir
 }
 
@@ -354,6 +355,17 @@ partition_sub () {
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n", 
     "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
 }
+
+
+stopcomputation_sub () {
+    [ -z $jobid_d ] && echo "Error: no jobID given" && exit 1
+    dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
+    [ -z "$dir" ] && exit 1
+
+    touch "$dir"/stopfile
+    echo stopfile written
+}
+
 
 erase () {
     for i in $(seq $1)
@@ -438,6 +450,13 @@ do
             follow="y"
             shift
             ;;
+        --stop)
+            shift
+            jobid_d="$1"
+            stopcomputation_sub 
+            exit 0
+            ;;
+
         -h|--help)
             man_sub
             exit 0

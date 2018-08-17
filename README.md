@@ -45,6 +45,10 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
     <td>Don't print the project number in the job name</td>
   </tr>
   <tr>
+    <td>--stop [jobID]</td>
+    <td>Writes a stopfile in the computation working directory to cleanly stop the simulation</td>
+  </tr>
+  <tr>
     <td>-f / --follow ([time])</td>
     <td>Refresh the your job list every [time]s (default being 15s)</td>
   </tr>
