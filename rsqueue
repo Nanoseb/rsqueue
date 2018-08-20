@@ -1,5 +1,5 @@
 #!/bin/bash
-# rsqueue: v2.0.9
+# rsqueue: v2.0.10
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
@@ -11,22 +11,23 @@ defaultparams="-i"
 
 man_sub () {
     echo -e "Usage: rsqueue [OPTIONS]
-    -i                       Print detailed info about refresco job (default behaviour)
+    -i                       Prints detailed info about refresco job (default behaviour)
                                  A \"\e[31m!\e[0m\" will appear near the \"Iterations\" column if the calculation is not converging
                                  The time left will turn red if the runtime specified in the jobfile is not long enough
-    -u ([users])             Print job info of all users (default) or from a comma separated list of users
+    -u ([users])             Prints job info of all users (default) or from a comma separated list of users
     -t / --top               Equivalent of slurmtop to summarize cluster load
-    -p                       Print info about partitions usage
-    -c                       Count the number of core used per user
-    -d [jobID]               Print the working directory of the specified JobID
-    -s                       Don't print the storage needed for simulations
-    -r                       Print only running jobs
-    --st                     Sort job list by start time
-    --pn                     Don't print the project number in the job name
+    -p                       Prints info about partitions usage
+    -c                       Counts the number of core used per user
+    -d [jobID]               Prints the working directory of the specified JobID
+    -s                       Doesn't print the storage needed for simulations
+    -r                       Prints only running jobs
+    --maxit                  Prints the maximum iteration number possible within the job time limit
+    --st                     Sorts job list by start time
+    --pn                     Doesn't print the project number in the job name
     --stop [jobID]           Writes a stopfile in the computation working directory to cleanly stop the simulation
-    -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
-    -a / --all               Print (almost) everything (equivalent of: rsqueue $allparams)
-    -h / --help              Print this help"
+    -f / --follow ([time])   Refreshes the your job list every [time]s (default being 15s)
+    -a / --all               Prints (almost) everything (equivalent of: rsqueue $allparams)
+    -h / --help              Prints this help"
 }
 
 
@@ -174,8 +175,15 @@ main_sub () {
 
             percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
 
+
             costETA=$(bc <<<"0.05*$jobcore*($ETAepoch-$startepoch)/3600")
             costnow=$(bc <<<"0.05*$jobcore*($nowepoch-$startepoch)/3600")
+
+            if [[ "$maxit" ]]
+            then
+                maxIteration=$(bc <<<"($currentstep-$initialtimestepf)*($jobtimelimit)/($nowepoch-$startepoch)")
+                maxitString=" (it=$maxIteration)"
+            fi
 
             if [ "$strg" = "1" ]
             then
@@ -200,11 +208,11 @@ main_sub () {
                     printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %5s/%5s € %3s %s %-8s %b %-20s %s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
                         "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "$costnow" "$costETA"\
-                        "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                        "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 else
                     printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %3s %s %-8s %b %-20s %s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 fi
 
             else
@@ -213,11 +221,11 @@ main_sub () {
                 then
                     printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %5s/%5s € %4s %s %-8s %b %-20s %s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "$costnow" "$costETA" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "$costnow" "$costETA" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 else
-                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %4s %s %-8s %b %-20s %s \e[0m\n" \
+                    printf "%-15s;%-16s;%-9s;%-5s;%7s/%-7s\e[31m%1s\e[0m;%3s%%;%8s;%4s;%s;%-8s;%b;%-20s;%s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime"
+                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 fi
             fi
 
@@ -363,7 +371,8 @@ stopcomputation_sub () {
     [ -z "$dir" ] && exit 1
 
     touch "$dir"/stopfile
-    echo stopfile written
+
+    echo stopfile written in "$dir"
 }
 
 
@@ -436,6 +445,10 @@ do
             ;;  
         -p)
             params="$params -p"
+            shift
+            ;;
+        --maxit)
+            maxit=1
             shift
             ;;
         -f|--follow)

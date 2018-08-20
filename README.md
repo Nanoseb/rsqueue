@@ -6,11 +6,11 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
 <table>
   <tr>
     <td>-i</td>
-    <td>Print detailed info about refresco job (default behaviour),A "!" will appear near the "Iterations" column if the calculation is not converging,The time left will turn red if the runtime specified in the jobfile is not long enough</td>
+    <td>Prints detailed info about refresco job (default behaviour),A "!" will appear near the "Iterations" column if the calculation is not converging,The time left will turn red if the runtime specified in the jobfile is not long enough</td>
   </tr>
   <tr>
     <td>-u ([users])</td>
-    <td>Print job info of all users (default) or from a comma separated list of users</td>
+    <td>Prints job info of all users (default) or from a comma separated list of users</td>
   </tr>
   <tr>
     <td>-t / --top</td>
@@ -18,31 +18,35 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
   </tr>
   <tr>
     <td>-p</td>
-    <td>Print info about partitions usage</td>
+    <td>Prints info about partitions usage</td>
   </tr>
   <tr>
     <td>-c</td>
-    <td>Count the number of core used per user</td>
+    <td>Counts the number of core used per user</td>
   </tr>
   <tr>
     <td>-d [jobID]</td>
-    <td>Print the working directory of the specified JobID</td>
+    <td>Prints the working directory of the specified JobID</td>
   </tr>
   <tr>
     <td>-s</td>
-    <td>Don't print the storage needed for simulations</td>
+    <td>Doesn't print the storage needed for simulations</td>
   </tr>
   <tr>
     <td>-r</td>
-    <td>Print only running jobs</td>
+    <td>Prints only running jobs</td>
+  </tr>
+  <tr>
+    <td>--maxit</td>
+    <td>Prints the maximum iteration number possible within the job time limit</td>
   </tr>
   <tr>
     <td>--st</td>
-    <td>Sort job list by start time</td>
+    <td>Sorts job list by start time</td>
   </tr>
   <tr>
     <td>--pn</td>
-    <td>Don't print the project number in the job name</td>
+    <td>Doesn't print the project number in the job name</td>
   </tr>
   <tr>
     <td>--stop [jobID]</td>
@@ -50,15 +54,15 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
   </tr>
   <tr>
     <td>-f / --follow ([time])</td>
-    <td>Refresh the your job list every [time]s (default being 15s)</td>
+    <td>Refreshes the your job list every [time]s (default being 15s)</td>
   </tr>
   <tr>
     <td>-a / --all</td>
-    <td>Print (almost) everything (equivalent of: rsqueue -u -t -p -i)</td>
+    <td>Prints (almost) everything (equivalent of: rsqueue -u -t -p -i)</td>
   </tr>
   <tr>
     <td>-h / --help</td>
-    <td>Print this help</td>
+    <td>Prints this help</td>
   </tr>
 </table>
 
