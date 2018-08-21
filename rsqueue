@@ -234,6 +234,7 @@ main_sub () {
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
             colorpd=""
             [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
+            [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco \e[31m"'/!\'" stopfile present\e[0m"
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
@@ -371,8 +372,7 @@ stopcomputation_sub () {
     [ -z "$dir" ] && exit 1
 
     touch "$dir"/stopfile
-
-    echo stopfile written in "$dir"
+    [ $? ] || echo stopfile written to "$dir"
 }
 
 
