@@ -223,7 +223,7 @@ main_sub () {
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
                         "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "$costnow" "$costETA" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 else
-                    printf "%-15s;%-16s;%-9s;%-5s;%7s/%-7s\e[31m%1s\e[0m;%3s%%;%8s;%4s;%s;%-8s;%b;%-20s;%s \e[0m\n" \
+                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %4s %s %-8s %b %-20s %s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
                         "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
                 fi
@@ -265,6 +265,7 @@ main_sub () {
         fi
     done <<<"$(squeue -S $sort -h -u $USER -o "%T %i")"
 
+    [ $strg = 1 ] && storage_sub
 }
 
 storage_sub () {
@@ -502,7 +503,6 @@ for param in $params
 do
     case $param in
         -i) main_sub 
-            [ $strg = 1 ] && storage_sub
             ;;
         -c) count_sub
             ;;
@@ -516,18 +516,18 @@ do
             ;;
     esac
 
-    main_nb_line=$((main_nb_line + 1))
-    echo
+    echo 
 done
+main_nb_line=$((main_nb_line + 1))
 
 if [[ "$follow" ]]
 then
     while sleep $refresh_time;
     do
+        var=$(main_sub)
         erase $main_nb_line
-        main_nb_line=0
-        main_sub
-        [ $strg = 1 ] && storage_sub
+        echo -e "$var"
+        main_nb_line=$(wc -l <<<"$var")
     done
 fi
 
