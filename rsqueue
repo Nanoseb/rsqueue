@@ -1,9 +1,9 @@
 #!/bin/bash
-# rsqueue: v2.0.12
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
+version="v2.1.0"
 
 allparams="-u -t -p -i"
 defaultparams="-i"
@@ -36,10 +36,15 @@ Tools:
   --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
   -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
   --notif                  Display a desktop notification when a job state changes, needs X-forwarding and -f
+  -v / --version           Show version number
   -h / --help              Print this help
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
+}
+
+version_sub () {
+    echo "rsqueue version $version"
 }
 
 
@@ -539,9 +544,12 @@ do
             stopcomputation_sub
             exit 0
             ;;
-
         -h|--help)
             man_sub
+            exit 0
+            ;;
+        -v|--version)
+            version_sub
             exit 0
             ;;
         -4) #for debug only
