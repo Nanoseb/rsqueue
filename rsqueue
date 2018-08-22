@@ -102,16 +102,19 @@ main_sub () {
         fi
  
         [ -d "$dir" ] || continue
-        controls="$dir"/controls.xml
-        residuals="$dir"/residuals.dat
+        controlspath="$dir"/controls.xml
+        residualspath="$dir"/residuals.dat
 
 
         isrefresco="y"
         [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout")
         
 
-        if [ "$jobstate" = "RUNNING" ] && [ -e "$controls" ] && [ -e "$residuals" ] && [ "$isrefresco" ]
+        if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
         then
+
+            controls=$(cat "$controlspath")
+            residuals=$(cat "$residualspath")
 
             mem=$(sstat -n --format=AveVMSize -j $jobid 2> /dev/null)
             [ $? == 0 ] || mem=0
@@ -119,27 +122,27 @@ main_sub () {
 
             outerwarn=""
             initialtimestep=0
-            unsteady=$(xmllint --shell "$controls" <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
+            unsteady=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
             if [ "$unsteady" ]
             then
-                currentstep=$(tail -n 1 "$residuals" | awk '{print $2}' | sed 's/[^0-9]//g')
-                maxtimestep=$(xmllint --shell "$controls" <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
+                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $2}' | sed 's/[^0-9]//g')
+                maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
 
-                boolrestart=$(xmllint --shell "$controls" <<<'cat //controls/restart/restart' | grep -m 1 true)
-                boolresetcount=$(xmllint --shell "$controls" <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
-                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell "$controls" <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
+                boolrestart=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/restart' | grep -m 1 true)
+                boolresetcount=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
+                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell "<($controls)" <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
 
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
-                outermax=$(xmllint --shell "$controls" <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
-                outercurrent=$(tail -n 1 "$residuals" | awk '{print $3}')
+                outermax=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
+                outercurrent=$(tail -n 1 <(echo "$residuals") | awk '{print $3}')
                 [ "$outermax" = "$outercurrent" ] && outerwarn="!"
             else
-                currentstep=$(tail -n 1 "$residuals" | awk '{print $1}' | sed 's/[^0-9]//g')
-                maxtimestep=$(xmllint --shell "$controls" <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
+                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $1}' | sed 's/[^0-9]//g')
+                maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
             fi
 
-            initialtimestepf=$(head -n 3 "$residuals" | sed '3!d' | awk '{print $2}')
+            initialtimestepf=$(head -n 3 <(echo "$residuals") | sed '3!d' | awk '{print $2}')
             [ -z "$initialtimestepf" ] && initialtimestepf=$initialtimestep
 
             [ -z "$currentstep" ] && currentstep=$(bc <<<"$initialtimestep +1")
