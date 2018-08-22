@@ -130,7 +130,8 @@ main_sub () {
 
                 boolrestart=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/restart' | grep -m 1 true)
                 boolresetcount=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
-                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell "<($controls)" <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
+
+                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
 
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
@@ -245,22 +246,24 @@ main_sub () {
                 then
                     if [ "$marclus" = "4" ]
                     then
-                        printf "%b%-15s %-16s %-9s %-5s %11s %59s %-9s %s \e[0m\n"\
+                        printf "%b%-15s %-16s %-9s %-5s %11s %59s %-9s %b \e[0m\n"\
                             "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
                     else
-                        printf "%b%-15s %-16s %-9s %-5s %11s %45s %-9s %s \e[0m\n"\
+                        printf "%b%-15s %-16s %-9s %-5s %11s %45s %-9s %b \e[0m\n"\
                             "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
                     fi
 
                 else
 
+                    reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
                     if [ "$marclus" = "4" ]
                     then
-                        printf "%b%-15s %-16s %-9s %-5s %11s %48s %-9s %s \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+#                        printf "%b%-15s %-16s %-9s %-5s %11s %48s %-9s %b \e[0m\n"\
+                        printf "%b%-15s %-16s %-9s %-8s %-41s %16s %-9s %b \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
                     else
-                        printf "%b%-15s %-16s %-9s %-5s %11s %34s %-9s %s \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                        printf "%b%-15s %-16s %-9s %-8s %-26s %16s %-9s %b \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
                     fi
 
                 fi
