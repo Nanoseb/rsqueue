@@ -397,22 +397,22 @@ stopcomputation_sub () {
 
 
 display-notif () {
+    pendingJobs=$(squeue -h -u $USER -o "%T" | grep PENDING | wc -l)
+    runningJobs=$(squeue -h -u $USER -o "%T" | grep RUNNING | wc -l)
+
     [[ -z "$pendingJobsOld" ]] && pendingJobsOld=$pendingJobs
     [[ -z "$runningJobsOld" ]] && runningJobsOld=$runningJobs
 
-    if [ -n "$DISPLAY" ]
+    if [[ "$runningJobsOld" != "$runningJobs" ]] || [[ "$pendingJobsOld" != "$pendingJobs" ]]
     then
-        if [[ "$runningJobsOld" != "$runningJobs" ]] || [[ "$pendingJobsOld" != "$pendingJobs" ]]
-        then
-            diffrunning=$((runningJobs - runningJobsOld))
-            diffpending=$((pendingJobs - pendingJobsOld))
-            [[ ${diffrunning:0:1} != '-' ]] && diffrunning="+$diffrunning"
-            [[ ${diffpending:0:1} != '-' ]] && diffpending="+$diffpending"
-            pendingJobsOld="$pendingJobs"
-            runningJobsOld="$runningJobs"
+        diffrunning=$((runningJobs - runningJobsOld))
+        diffpending=$((pendingJobs - pendingJobsOld))
+        [[ ${diffrunning:0:1} != '-' ]] && diffrunning="+$diffrunning"
+        [[ ${diffpending:0:1} != '-' ]] && diffpending="+$diffpending"
+        pendingJobsOld="$pendingJobs"
+        runningJobsOld="$runningJobs"
 
-            notify-send "rsqueue on $HOSTNAME" "$runningJobs running jobs ($diffrunning)\n$pendingJobs pending jobs ($diffpending)"
-        fi
+        notify-send "rsqueue on $HOSTNAME" "$runningJobs running jobs ($diffrunning)\n$pendingJobs pending jobs ($diffpending)"
     fi
 }
 
@@ -586,13 +586,7 @@ then
         echo -e "$var"
         main_nb_line=$(wc -l <<<"$var")
 
-        if [ "$notif" ]
-        then
-            pendingJobs=$(grep "PENDING" <<<"$var" | wc -l)
-            runningJobs=$(tail -n +3 <<<"$var" | awk '/^$/{exit} {print $0}' | grep -v "PENDING" | grep -v "No job" | wc -l)
-
-            display-notif
-        fi
+        [ "$notif" ] && display-notif
 
     done
 fi
