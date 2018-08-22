@@ -120,7 +120,7 @@ main_sub () {
         then
 
             controls=$(cat "$controlspath")
-            residuals=$(cat "$residualspath")
+            residuals=$( (head; tail) < "$residualspath")
 
             mem=$(sstat -n --format=AveVMSize -j $jobid 2> /dev/null)
             [ $? == 0 ] || mem=0
@@ -248,20 +248,21 @@ main_sub () {
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
+
+                reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
                 if [ "$strg" = 1 ]
                 then
                     if [ "$marclus" = "4" ]
                     then
-                        printf "%b%-15s %-16s %-9s %-5s %11s %59s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                        printf "%b%-15s %-16s %-9s %-8s %-51s %16s %-9s %b \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
                     else
-                        printf "%b%-15s %-16s %-9s %-5s %11s %45s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate" "$jobdate" "$jobtime" "$refresco"
+                        printf "%b%-15s %-16s %-9s %-8s %-37s %16s %-9s %b \e[0m\n"\
+                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
                     fi
 
                 else
 
-                    reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
                     if [ "$marclus" = "4" ]
                     then
                         printf "%b%-15s %-16s %-9s %-8s %-41s %16s %-9s %b \e[0m\n"\
