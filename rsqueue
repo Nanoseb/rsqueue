@@ -274,10 +274,11 @@ main_sub () {
 storage_sub () {
     echo
     echo Total disk space needed: $(convert_human $ETAsizetotal)
-    [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
+    # [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
 
     main_nb_line=$((main_nb_line + 3))
+    # [ "$marclus" = 4 ] && main_nb_line=$((main_nb_line + 1))
 }
 
 
