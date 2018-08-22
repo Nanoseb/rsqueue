@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="v2.1.0"
+version="2.1.0"
 
 allparams="-u -t -p -i"
 defaultparams="-i"
