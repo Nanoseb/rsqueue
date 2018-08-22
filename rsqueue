@@ -396,11 +396,18 @@ partition_sub () {
 
 stopcomputation_sub () {
     [ -z $jobid_d ] && echo "Error: no jobID given" && exit 1
-    dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
-    [ -z "$dir" ] && exit 1
+    state=$(scontrol show job $jobid_d | grep -m 1 "^\ *JobState=" | sed 's/^[^=]*=//')
+    if [ "$state" == "RUNNING" ]
+    then
+        dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
+        [ -z "$dir" ] && exit 1
 
-    touch "$dir"/stopfile
-    [ $? ] || echo stopfile written to "$dir"
+        touch "$dir"/stopfile
+        [ $? ] || echo stopfile written to "$dir"
+    else
+        echo "Job not running, launching 'scancel $jobid_d'"
+        scancel "$jobid_d"
+    fi
 }
 
 
