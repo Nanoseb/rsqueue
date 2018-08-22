@@ -1,5 +1,5 @@
 #!/bin/bash
-# rsqueue: v2.0.10
+# rsqueue: v2.0.11
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
@@ -18,10 +18,10 @@ Outputs:
   -u ([users])             Print job info of all users (default) or from a comma separated list of users
   -t / --top               Equivalent of slurmtop to summarize cluster load
   -p                       Print info about partitions usage
-  -c                       Count the number of core used per user 
+  -c                       Count the number of core used per user
   -a / --all               Print (almost) everything (equivalent of: rsqueue $allparams)
 
-Output tweaking:    
+Output tweaking:
   -s                       Don't print the storage needed for simulations (speed up output)
   -r                       Print only running jobs
   --maxit                  Print the maximum iteration number possible within the job time limit
@@ -33,7 +33,11 @@ Tools:
   -d [jobID]               Print the working directory of the specified JobID
   --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
   -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
-  -h / --help              Print this help"
+  --notif                  Display a desktop notification when a job state changes, needs X-forwarding and -f
+  -h / --help              Print this help
+
+rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
+Get the latest version from: https://github.com/nanoseb/rsqueue"
 }
 
 
@@ -46,7 +50,7 @@ gen_line() {
 }
 
 main_sub () {
-    
+
     # Header
     if [ "$strg" = 1 ]
     then
@@ -88,7 +92,7 @@ main_sub () {
         # Gathering of job metadata
         jobstate=$(awk '{print $1}' <<<$line)
         jobid=$(awk '{print $2}' <<<$line)
-        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g') 
+        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
@@ -106,7 +110,7 @@ main_sub () {
         else
             jobname_short=$(sed 's/^[^_]*_//' <<<"$jobname")
         fi
- 
+
         [ -d "$dir" ] || continue
         controlspath="$dir"/controls.xml
         residualspath="$dir"/residuals.dat
@@ -114,7 +118,7 @@ main_sub () {
 
         isrefresco="y"
         [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout")
-        
+
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
         then
@@ -155,7 +159,7 @@ main_sub () {
             [ -z "$currentstep" ] && currentstep=$(bc <<<"$initialtimestep +1")
             [ "$currentstep" = "$initialtimestepf" ] && currentstep=$(bc <<<"$initialtimestepf +1")
 
-            #jobdate=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $3}' | sed 's/\./\//g') 
+            #jobdate=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $3}' | sed 's/\./\//g')
             #jobtime=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $4}')
 
             jobtimelimit=$(grep -m 1 "^TimeLimit=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/-/:/' | sed 's/^\(..:..:..\)$/0:\1/' | awk -F":" '{print $4+$3*60+$2*3600+$1*86400}')
@@ -239,7 +243,7 @@ main_sub () {
                 fi
             fi
 
-        else 
+        else
             refresco=""
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
             colorpd=""
@@ -341,14 +345,14 @@ top_sub () {
             partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
             echo "$user $nbjob pending $core $partition"
 
-        done <<<"$users_t" | sort -n -k 4 -r  
+        done <<<"$users_t" | sort -n -k 4 -r
     fi
 
 }
 
 
 wdir_sub () {
-    if [ -z $jobid_d ] 
+    if [ -z $jobid_d ]
     then
         jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
         [ -z $jobid_d ] && echo "No jobID" && exit 1
@@ -377,7 +381,7 @@ userl_sub () {
 
 
 partition_sub () {
-    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n", 
+    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
     "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
 }
 
@@ -389,6 +393,27 @@ stopcomputation_sub () {
 
     touch "$dir"/stopfile
     [ $? ] || echo stopfile written to "$dir"
+}
+
+
+display-notif () {
+    [[ -z "$pendingJobsOld" ]] && pendingJobsOld=$pendingJobs
+    [[ -z "$runningJobsOld" ]] && runningJobsOld=$runningJobs
+
+    if [ -n "$DISPLAY" ]
+    then
+        if [[ "$runningJobsOld" != "$runningJobs" ]] || [[ "$pendingJobsOld" != "$pendingJobs" ]]
+        then
+            diffrunning=$((runningJobs - runningJobsOld))
+            diffpending=$((pendingJobs - pendingJobsOld))
+            [[ ${diffrunning:0:1} != '-' ]] && diffrunning="+$diffrunning"
+            [[ ${diffpending:0:1} != '-' ]] && diffpending="+$diffpending"
+            pendingJobsOld="$pendingJobs"
+            runningJobsOld="$runningJobs"
+
+            notify-send "rsqueue on $HOSTNAME" "$runningJobs running jobs ($diffrunning)\n$pendingJobs pending jobs ($diffpending)"
+        fi
+    fi
 }
 
 
@@ -458,7 +483,7 @@ do
         --st)
             sort="S,-Q"
             shift
-            ;;  
+            ;;
         -p)
             params="$params -p"
             shift
@@ -483,10 +508,20 @@ do
             follow="y"
             shift
             ;;
+        --notif)
+            if [ -n "$DISPLAY" ]
+            then
+                notif=1
+            else
+                notif=0
+                echo "WARNING: Notification display not possible, you need ssh X-forwarding"
+            fi
+            shift
+            ;;
         --stop)
             shift
             jobid_d="$1"
-            stopcomputation_sub 
+            stopcomputation_sub
             exit 0
             ;;
 
@@ -507,7 +542,7 @@ do
 done
 
 
-if [ -z "$params" ] 
+if [ -z "$params" ]
 then
     params=$defaultparams
 fi
@@ -518,10 +553,10 @@ then
 fi
 
 main_nb_line=0
-for param in $params 
+for param in $params
 do
     case $param in
-        -i) main_sub 
+        -i) main_sub
             ;;
         -c) count_sub
             ;;
@@ -535,18 +570,30 @@ do
             ;;
     esac
 
-    echo 
+    echo
 done
 main_nb_line=$((main_nb_line + 1))
 
+pendingJobsOld=""
+runningJobsOld=""
+
 if [[ "$follow" ]]
 then
-    while sleep $refresh_time;
+    while sleep "$refresh_time";
     do
         var=$(main_sub)
         erase $main_nb_line
         echo -e "$var"
         main_nb_line=$(wc -l <<<"$var")
+
+        if [ "$notif" ]
+        then
+            pendingJobs=$(grep "PENDING" <<<"$var" | wc -l)
+            runningJobs=$(tail -n +3 <<<"$var" | awk '/^$/{exit} {print $0}' | grep -v "PENDING" | wc -l)
+
+            display-notif
+        fi
+
     done
 fi
 

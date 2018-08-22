@@ -7,8 +7,8 @@ It have been first develloped at MARIN (Maritime Research Institute Netherlands)
 Usage: rsqueue [OPTIONS]
 Outputs:
   -i                       Print detailed info about refresco job (default behaviour)
-                               A "!" will appear near the "Iterations" column if the calculation is not converging
-                               The time left will turn red if the runtime specified in the jobfile is not long enough
+                               A "!" appears near the "Iterations" column if the calculation is not converging
+                               The time left turns red if the jobfile time limit is not long enough
   -u ([users])             Print job info of all users (default) or from a comma separated list of users
   -t / --top               Equivalent of slurmtop to summarize cluster load
   -p                       Print info about partitions usage
@@ -27,6 +27,7 @@ Tools:
   -d [jobID]               Print the working directory of the specified JobID
   --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
   -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
+  --notif                  Display a desktop notification when a job state changes, needs X-forwarding and -f
   -h / --help              Print this helps
 ```
 
