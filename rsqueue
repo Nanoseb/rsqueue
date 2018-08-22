@@ -1,5 +1,5 @@
 #!/bin/bash
-# rsqueue: v2.0.11
+# rsqueue: v2.0.12
 # Script used to monitor jobs and refresco running instances more particularly
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
@@ -8,6 +8,8 @@
 allparams="-u -t -p -i"
 defaultparams="-i"
 
+MemFactor=4
+# n MCells => MemFactor*n GB RAM
 
 man_sub () {
     echo -e "Usage: rsqueue [OPTIONS]
@@ -57,22 +59,22 @@ main_sub () {
         if [ "$marclus" = 4 ]
         then
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-13s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
             gen_line 167
         else
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Memory" "Start time" "ETA" "Time left"
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Start time" "ETA" "Time left"
             gen_line 153
         fi
     else
         if [ "$marclus" = 4 ]
         then
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-9s %-14s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Cost" "Start time" "ETA" "Time left"
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
             gen_line 156
         else
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-10s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Memory" "Start time" "ETA" "Time left"
+                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Start time" "ETA" "Time left"
             gen_line 142
         fi
     fi
@@ -126,9 +128,15 @@ main_sub () {
             controls=$(cat "$controlspath")
             residuals=$( (head; tail) < "$residualspath")
 
-            mem=$(sstat -n --format=AveVMSize -j $jobid 2> /dev/null)
-            [ $? == 0 ] || mem=0
-            mem_s=$(convert_human "$(sed 's/K//' <<<"$mem")")
+            reportgeneral=$(cat "$dir"/report_general.xml)'</log>'
+            nCells=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/topology_info/topology_file/nIntCells/total' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
+            if [[ "$nCells" ]]
+            then
+                mem=$(bc <<<"$nCells * $MemFactor *1.048576/$jobcore") # Memory in K
+                mem_s='~'$(convert_human "$mem")
+            else
+                mem_s=''
+            fi
 
             outerwarn=""
             initialtimestep=0
@@ -248,7 +256,7 @@ main_sub () {
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
             colorpd=""
             [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
-            [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco \e[31m"'/!\'" stopfile present\e[0m"
+            [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco \e[1;31m"'/!\'" stopfile present\e[0m"
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
