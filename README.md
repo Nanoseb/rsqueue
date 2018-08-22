@@ -3,69 +3,32 @@ Script used to monitor jobs and refresco running instances more particularly on 
 It have been first develloped at MARIN (Maritime Research Institute Netherlands) so some parameters should be adapted for other facilities.
 
 ## man : 
-<table>
-  <tr>
-    <td>-i</td>
-    <td>Prints detailed info about refresco job (default behaviour),A "!" will appear near the "Iterations" column if the calculation is not converging,The time left will turn red if the runtime specified in the jobfile is not long enough</td>
-  </tr>
-  <tr>
-    <td>-u ([users])</td>
-    <td>Prints job info of all users (default) or from a comma separated list of users</td>
-  </tr>
-  <tr>
-    <td>-t / --top</td>
-    <td>Equivalent of slurmtop to summarize cluster load</td>
-  </tr>
-  <tr>
-    <td>-p</td>
-    <td>Prints info about partitions usage</td>
-  </tr>
-  <tr>
-    <td>-c</td>
-    <td>Counts the number of core used per user</td>
-  </tr>
-  <tr>
-    <td>-d [jobID]</td>
-    <td>Prints the working directory of the specified JobID</td>
-  </tr>
-  <tr>
-    <td>-s</td>
-    <td>Doesn't print the storage needed for simulations</td>
-  </tr>
-  <tr>
-    <td>-r</td>
-    <td>Prints only running jobs</td>
-  </tr>
-  <tr>
-    <td>--maxit</td>
-    <td>Prints the maximum iteration number possible within the job time limit</td>
-  </tr>
-  <tr>
-    <td>--st</td>
-    <td>Sorts job list by start time</td>
-  </tr>
-  <tr>
-    <td>--pn</td>
-    <td>Doesn't print the project number in the job name</td>
-  </tr>
-  <tr>
-    <td>--stop [jobID]</td>
-    <td>Writes a stopfile in the computation working directory to cleanly stop the simulation</td>
-  </tr>
-  <tr>
-    <td>-f / --follow ([time])</td>
-    <td>Refreshes the your job list every [time]s (default being 15s)</td>
-  </tr>
-  <tr>
-    <td>-a / --all</td>
-    <td>Prints (almost) everything (equivalent of: rsqueue -u -t -p -i)</td>
-  </tr>
-  <tr>
-    <td>-h / --help</td>
-    <td>Prints this help</td>
-  </tr>
-</table>
+```
+Usage: rsqueue [OPTIONS]
+Outputs:
+  -i                       Print detailed info about refresco job (default behaviour)
+                               A "!" will appear near the "Iterations" column if the calculation is not converging
+                               The time left will turn red if the runtime specified in the jobfile is not long enough
+  -u ([users])             Print job info of all users (default) or from a comma separated list of users
+  -t / --top               Equivalent of slurmtop to summarize cluster load
+  -p                       Print info about partitions usage
+  -c                       Count the number of core used per user 
+  -a / --all               Print (almost) everything (equivalent of: rsqueue -u -t -p -i)
 
+Output tweaking:    
+  -s                       Don't print the storage needed for simulations (speed up output)
+  -r                       Print only running jobs
+  --maxit                  Print the maximum iteration number possible within the job time limit
+  --st                     Sort job list by start time
+  --pn                     Don't print the project number in the job name
+  --node                   Print the nodes being used in the -u output
+
+Tools:
+  -d [jobID]               Print the working directory of the specified JobID
+  --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
+  -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
+  -h / --help              Print this helps
+```
 
 
 
