@@ -589,7 +589,7 @@ then
         if [ "$notif" ]
         then
             pendingJobs=$(grep "PENDING" <<<"$var" | wc -l)
-            runningJobs=$(tail -n +3 <<<"$var" | awk '/^$/{exit} {print $0}' | grep -v "PENDING" | wc -l)
+            runningJobs=$(tail -n +3 <<<"$var" | awk '/^$/{exit} {print $0}' | grep -v "PENDING" | grep -v "No job" | wc -l)
 
             display-notif
         fi
