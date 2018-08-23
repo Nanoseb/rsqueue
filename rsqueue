@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.0"
+version="2.1.1"
 
 allparams="-u -t -p -i"
 defaultparams="-i"
@@ -80,7 +80,6 @@ main_sub () {
         fi
     fi
 
-    main_nb_line=$((main_nb_line + 2))
 
     ETA24hsize=0
     ETAsizetotal=0
@@ -89,7 +88,6 @@ main_sub () {
 
     while read line;
     do
-        main_nb_line=$((main_nb_line + 1))
         [ ! "$line" ] && echo "No job" && strg=0 && continue
 
         # Gathering of job metadata
@@ -227,7 +225,6 @@ main_sub () {
 
                 if [ "$marclus" = "4" ]
                 then
-
                     printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %5s/%5s € %3s %s %-8s %b %-20s %s \e[0m\n" \
                         "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
                         "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "$costnow" "$costETA"\
@@ -299,8 +296,6 @@ storage_sub () {
     # [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
 
-    main_nb_line=$((main_nb_line + 3))
-    # [ "$marclus" = 4 ] && main_nb_line=$((main_nb_line + 1))
 }
 
 
@@ -329,9 +324,7 @@ top_sub () {
 
     list=$(squeue -t R -h -o "%u %D %C %P")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
-#    echo "USER NB_JOBS NB_NODES NB_CPUS PARTITIONS"
     echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
-#    gen_line 50
     while read user
     do
         userlist=$(grep ^$user\  <<<"$list")
@@ -581,11 +574,10 @@ then
     params=$allparams
 fi
 
-main_nb_line=0
 for param in $params
 do
     case $param in
-        -i) printWHeader "$(main_sub)"
+        -i) [[ "$follow" ]] || printWHeader "$(main_sub)"
             ;;
         -c) count_sub
             ;;
@@ -601,22 +593,22 @@ do
 
     echo
 done
-main_nb_line=$((main_nb_line + 1))
 
+main_nb_line=0
 pendingJobsOld=""
 runningJobsOld=""
 
-if [[ "$follow" ]] && [[ "$params" = *-i ]]
+if [[ "$follow" ]] 
 then
-    while sleep "$refresh_time";
+    while true;
     do
-        var=$(main_sub)
+        var=$(printWHeader "$(main_sub)")
         erase $main_nb_line
-        echo -e "$var"
         main_nb_line=$(wc -l <<<"$var")
+        echo "$var"
 
         [ "$notif" ] && display-notif
-
+        sleep "$refresh_time"
     done
 fi
 
