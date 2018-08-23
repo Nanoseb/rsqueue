@@ -3,13 +3,32 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.1"
+version="2.1.2"
 
+# default parameters
 allparams="-u -t -p -i"
 defaultparams="-i"
 
+
+strg=1
+cost=0
+[[ "$(hostname | cut -c8)" == "4" ]] &&  cost=1
+
+maxit=0
+memfield=1
+runonly=0
+project_number=1
+cpuhcost=0.05
+
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
+
+fileconf="$HOME/.config/rsqueue.conf"
+# loading configuration file
+if [[ -f "$fileconf" ]]
+then
+    source "$fileconf"
+fi
 
 man_sub () {
     echo -e "Usage: rsqueue [OPTIONS]
@@ -26,6 +45,8 @@ Outputs:
 Output tweaking:
   -s                       Don't print the storage needed for simulations (speed up output)
   -r                       Print only running jobs
+  --cost                   Print the current and final cost of the job 
+  --memory                 Hide the memory/core column
   --maxit                  Print the maximum iteration number possible within the job time limit
   --st                     Sort job list by start time
   --pn                     Don't print the project number in the job name
@@ -36,16 +57,70 @@ Tools:
   --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
   -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
   --notif                  Display a desktop notification when a job state changes, needs X-forwarding and -f
+  --export-conf            Export a default configuration file in ~/.config/rsqueue.conf
   -v / --version           Show version number
   -h / --help              Print this help
+
+
+  In the main output (-i), all the estimated values (ETA, Time left, Storage, Cost, Max job It) are based on a linear extrapolation of the time the computation took since the start of the job.
+  The Mem/core output is an estimation of ReFRESCO memory usage per core based on the cell count of the simulation, the ratio \"n MCells -> $MemFactor*n GB Ram\" is used.
+  The --maxit/Max job It output is the maximum number of iteration that can fit within the time limit of the job.
+  The cost column is based on a price of $cpuhcost €/CPU h.
+
+  A configuration file can be used to overwrite some default parameters, it must be placed in ~/.config/rsqueue.conf, a default configuration file is available via the command --export-conf. 
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
 }
 
 version_sub () {
-    echo "rsqueue version $version"
+    echo "rsqueue version $version
+
+rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
+Get the latest version from: https://github.com/nanoseb/rsqueue"
+
 }
+
+export_conf () {
+
+echo "# Configuration file for rsqueue
+# for power users only ;)
+
+# Default output
+defaultparams=\"$defaultparams\"
+
+# Parameters used when using -a
+allparams=\"$allparams\"
+
+# Prints storage related output (1=true, 0=false)
+strg=$strg
+
+# Print job cost column (1=true, 0=false)
+cost=$cost
+
+# CPU h cost
+cpuhcost=$cpuhcost
+
+# Print "Max job it" column (1=true, 0=false)
+maxit=$maxit
+
+# Print Memory/Core column (1=true, 0=false)
+memfield=$memfield
+
+# Factor used to compute memory usage
+# n MCells => MemFactor*n GB RAM
+MemFactor=$MemFactor 
+
+# Print only running jobs (1=true, 0=false)
+runonly=$runonly
+
+# Print project number (1=true, 0=false)
+project_number=$project_number
+" > "$fileconf"
+
+    echo "Configuration file exported to $fileconf"
+}
+
 
 
 convert_human() {
@@ -56,30 +131,9 @@ gen_line() {
     printf "%${1}s\n" "" | sed 's/\ /─/g'
 }
 
-main_sub () {
-
-    # Header
-    if [ "$strg" = 1 ]
-    then
-        if [ "$marclus" = 4 ]
-        then
-            printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-13s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
-        else
-            printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Start time" "ETA" "Time left"
-        fi
-    else
-        if [ "$marclus" = 4 ]
-        then
-            printf "%-15s %-16s %-9s %-8s %-15s %-5s %-9s %-14s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
-        else
-            printf "%-15s %-16s %-9s %-8s %-15s %-5s %-10s %-20s %-20s %s\n"\
-                "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Start time" "ETA" "Time left"
-        fi
-    fi
-
+main_get_data () {
+    
+    echo "Directory;Job name;Job-ID;Cores;Iterations;Storage;%;Mem/Core;Cost;Start time;\e[0m;ETA;Time left;Max job It;"
 
     ETA24hsize=0
     ETAsizetotal=0
@@ -93,7 +147,8 @@ main_sub () {
         # Gathering of job metadata
         jobstate=$(awk '{print $1}' <<<$line)
         jobid=$(awk '{print $2}' <<<$line)
-        jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
+        [[ "$debug" ]] || jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
+        [[ "$debug" ]] && jobinfo=$(cat ~/$jobid)
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
@@ -191,21 +246,20 @@ main_sub () {
                 fi
             fi
 
-            colortime=""
+            colortime="\e[0m"
             [ "$ETAepoch" ] && [ "$((startepoch + jobtimelimit))" -lt "$ETAepoch" ] && colortime='\e[31m'
 
             percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
 
 
-            costETA=$(bc <<<"0.05*$jobcore*($ETAepoch-$startepoch)/3600")
-            costnow=$(bc <<<"0.05*$jobcore*($nowepoch-$startepoch)/3600")
+            costETA=$(bc <<<"$cpuhcost*$jobcore*($ETAepoch-$startepoch)/3600")
+            costnow=$(bc <<<"$cpuhcost*$jobcore*($nowepoch-$startepoch)/3600")
 
-            if [[ "$maxit" ]]
-            then
-                maxIteration=$(bc <<<"($currentstep-$initialtimestep)*($jobtimelimit)/($nowepoch-$startepoch) + $initialtimestep")
-                maxitString=" (it=$maxIteration)"
-            fi
+            maxIteration=$(bc <<<"($currentstep-$initialtimestep)*($jobtimelimit)/($nowepoch-$startepoch) + $initialtimestep")
+            maxitString="$maxIteration"
 
+            nowsizeh=""
+            ETAsizeh=""
             if [ "$strg" = "1" ]
             then
                 nowsize=$(du -s "$dir" | awk '{print $1}')
@@ -220,75 +274,58 @@ main_sub () {
                 else
                     ETA24hsize=$((ETA24hsize + ETAsize))
                 fi
-
-
-
-                if [ "$marclus" = "4" ]
-                then
-                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %5s/%5s € %3s %s %-8s %b %-20s %s \e[0m\n" \
-                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "$costnow" "$costETA"\
-                        "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
-                else
-                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %6s/%-6s %3s%% %6s %3s %s %-8s %b %-20s %s \e[0m\n" \
-                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$nowsizeh" "$ETAsizeh" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
-                fi
-
-            else
-
-                if [ "$marclus" = "4" ]
-                then
-                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %5s/%5s € %4s %s %-8s %b %-20s %s \e[0m\n" \
-                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "$costnow" "$costETA" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
-                else
-                    printf "%-15s %-16s %-9s %-5s %7s/%-7s\e[31m%1s\e[0m %3s%% %8s %4s %s %-8s %b %-20s %s \e[0m\n" \
-                        "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$currentstep" \
-                        "$maxtimestep" "$outerwarn" "$percent" "$mem_s" "" "$jobdate" "$jobtime" "$colortime" "$ETAdate" "$ETAtime$maxitString"
-                fi
             fi
 
+            echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
+
         else
-            refresco=""
+            refresco=''
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
             colorpd=""
             [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
-            [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco \e[1;31m"'/!\'" stopfile present\e[0m"
+            [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco"'/!\'" stopfile present"
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
-
                 reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
-                if [ "$strg" = 1 ]
-                then
-                    if [ "$marclus" = "4" ]
-                    then
-                        printf "%b%-15s %-16s %-9s %-8s %-51s %16s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
-                    else
-                        printf "%b%-15s %-16s %-9s %-8s %-37s %16s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
-                    fi
-
-                else
-
-                    if [ "$marclus" = "4" ]
-                    then
-                        printf "%b%-15s %-16s %-9s %-8s %-41s %16s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
-                    else
-                        printf "%b%-15s %-16s %-9s %-8s %-26s %16s %-9s %b \e[0m\n"\
-                            "$colorpd" "${dirp:0:15}" "${jobname_short:0:15}" "$jobid" "$jobcore" "$jobstate ($reason)" "$jobdate" "$jobtime" "$refresco"
-                    fi
-
-                fi
+                echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
             fi
         fi
-    done <<<"$(squeue -S $sort -h -u $USER -o "%T %i")"
+    done <<< "$(squeue -S $sort -h -u $USER -o "%T %i")"
+#    done <<<"$(cat ~/squeue)"
 
     [ $strg = 1 ] && storage_sub
 }
+
+main_sub () {
+
+    data=$(main_get_data)
+    storage=$(sed -n '/^$/,$p' <<<"$data")
+    data=$(sed '/^$/,+3d' <<<"$data")
+
+    [ "$debug" ] && data="$data"$'\n'"$(seq 15 | tr "\n" ";")"
+
+    # remove maxit
+    [ "$maxit" != 1 ] && data=$(sed 's/[^;]*;//14' <<<"$data")
+
+    # remove cost
+    [ "$cost" != 1 ] && data=$(sed 's/[^;]*;//9' <<<"$data")
+
+    # remove memory 
+    [ "$memfield" != 1 ] && data=$(sed 's/[^;]*;//8' <<<"$data")
+
+    # remove storage
+    [ "$strg" != 1 ] && data=$(sed 's/[^;]*;//6' <<<"$data")
+
+
+    echo -e "$data" |\
+        column -t -s ';' -o '  ' |\
+        sed -r 's/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2/;s/$/\x1b[0m/' |\
+        sed 's/\(.\!.\)/\x1b[31m\1\x1b[0m/'
+
+    echo "$storage"
+}
+
 
 storage_sub () {
     echo
@@ -389,7 +426,7 @@ partition_sub () {
 #    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
     echo "Partition,Total,Used,Error,Available,Usage"
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
-     $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}' 
+     $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
 }
 
 
@@ -433,21 +470,20 @@ display-notif () {
 printWHeader () {
     sub="$1"
     size=$(wc -L <<<"$sub")
+    size=$(sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" <<<"$sub" | wc -L)
     echo "$sub" | sed "2i$(gen_line $size)"
 }
 
 erase () {
     for i in $(seq $1)
     do
-        echo -en "\033[2K"
         tput cuu1
+        echo -en "\033[2K"
+        printf "%${COLUMNS}s" ""
+        echo -en "\033[2K"
     done
 }
 
-marclus=$(hostname | cut -c8)
-strg=1
-runonly=0
-project_number=1
 sort="-T,u,i"
 
 
@@ -515,6 +551,14 @@ do
             maxit=1
             shift
             ;;
+        --cost)
+            cost=1
+            shift
+            ;;
+        --memory)
+            memfield=0
+            shift
+            ;;
         -f|--follow)
             if [ -z "$2" ] || [ "${2:0:1}" = "-" ]
             then
@@ -543,6 +587,10 @@ do
             stopcomputation_sub
             exit 0
             ;;
+        --export-conf)
+            export_conf 
+            exit 0
+            ;;
         -h|--help)
             man_sub
             exit 0
@@ -551,8 +599,8 @@ do
             version_sub
             exit 0
             ;;
-        -4) #for debug only
-            marclus=4
+        --debug)
+            debug=1
             shift
             ;;
         *)
@@ -587,7 +635,7 @@ do
             ;;
         -u) printWHeader "$(userl_sub)"
             ;;
-        -p) printWHeader "$(partition_sub | column -t -s ',')"
+        -p) printWHeader "$(partition_sub | column -t -s ',' | sed -r 's/([0-9]+)/\x1b[32m\1\x1b[0m/4')"
             ;;
     esac
 
