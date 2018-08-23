@@ -53,7 +53,7 @@ convert_human() {
 }
 
 gen_line() {
-    printf "%${1}s \n" "" | sed 's/\ /─/g'
+    printf "%${1}s\n" "" | sed 's/\ /─/g'
 }
 
 main_sub () {
@@ -65,22 +65,18 @@ main_sub () {
         then
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-13s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
-            gen_line 167
         else
             printf "%-15s %-16s %-9s %-8s %-16s %-12s %-3s %-9s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "Storage" "%" "Mem/CPU" "Start time" "ETA" "Time left"
-            gen_line 153
         fi
     else
         if [ "$marclus" = 4 ]
         then
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-9s %-14s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Cost" "Start time" "ETA" "Time left"
-            gen_line 156
         else
             printf "%-15s %-16s %-9s %-8s %-15s %-5s %-10s %-20s %-20s %s\n"\
                 "Directory" "Job name" "Job-ID" "Cores" "Iterations" "%" "Mem/CPU" "Start time" "ETA" "Time left"
-            gen_line 142
         fi
     fi
 
@@ -441,6 +437,11 @@ display-notif () {
     fi
 }
 
+printWHeader () {
+    sub="$1"
+    size=$(wc -L <<<"$sub")
+    echo "$sub" | sed "2i$(gen_line $size)"
+}
 
 erase () {
     for i in $(seq $1)
@@ -584,17 +585,17 @@ main_nb_line=0
 for param in $params
 do
     case $param in
-        -i) main_sub
+        -i) printWHeader "$(main_sub)"
             ;;
         -c) count_sub
             ;;
         -d) wdir_sub
             ;;
-        -t) top_sub  | column -t  | sed -r 's/^(.*)pending(.*)$/\x1b[2m\1pending\2\x1b[0m/' | sed 's/_/ /g' | sed "2i$(gen_line 50)"
+        -t) printWHeader "$(top_sub  | column -t  | sed -r 's/^(.*)pending(.*)$/\x1b[2m\1pending\2\x1b[0m/' | sed 's/_/ /g')"
             ;;
-        -u) userl_sub
+        -u) printWHeader "$(userl_sub)"
             ;;
-        -p) partition_sub | column -t -s ','| sed "2i$(gen_line 50)"
+        -p) printWHeader "$(partition_sub | column -t -s ',')"
             ;;
     esac
 
