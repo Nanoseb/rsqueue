@@ -208,7 +208,7 @@ main_sub () {
 
             if [[ "$maxit" ]]
             then
-                maxIteration=$(bc <<<"($currentstep-$initialtimestepf)*($jobtimelimit)/($nowepoch-$startepoch)")
+                maxIteration=$(bc <<<"($currentstep-$initialtimestep)*($jobtimelimit)/($nowepoch-$startepoch) + $initialtimestep")
                 maxitString=" (it=$maxIteration)"
             fi
 
@@ -333,7 +333,9 @@ top_sub () {
 
     list=$(squeue -t R -h -o "%u %D %C %P")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
-    echo "USER NB_JOBS NB_NODES NB_CPUS PARTITIONS"
+#    echo "USER NB_JOBS NB_NODES NB_CPUS PARTITIONS"
+    echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
+#    gen_line 50
     while read user
     do
         userlist=$(grep ^$user\  <<<"$list")
@@ -394,8 +396,11 @@ userl_sub () {
 
 
 partition_sub () {
-    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
-    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
+#    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
+#    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
+    echo "Partition,Total,Used,Error,Available,Usage"
+    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
+     $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}' 
 }
 
 
@@ -585,11 +590,11 @@ do
             ;;
         -d) wdir_sub
             ;;
-        -t) top_sub  | column -t  | sed -r 's/^(.*)pending(.*)$/\x1b[2m\1pending\2\x1b[0m/'
+        -t) top_sub  | column -t  | sed -r 's/^(.*)pending(.*)$/\x1b[2m\1pending\2\x1b[0m/' | sed 's/_/ /g' | sed "2i$(gen_line 50)"
             ;;
         -u) userl_sub
             ;;
-        -p) partition_sub
+        -p) partition_sub | column -t -s ','| sed "2i$(gen_line 50)"
             ;;
     esac
 
@@ -600,7 +605,7 @@ main_nb_line=$((main_nb_line + 1))
 pendingJobsOld=""
 runningJobsOld=""
 
-if [[ "$follow" ]]
+if [[ "$follow" ]] && [[ "$params" = *-i ]]
 then
     while sleep "$refresh_time";
     do
