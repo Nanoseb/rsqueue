@@ -85,6 +85,7 @@ export_conf () {
 
 echo "# Configuration file for rsqueue
 # for power users only ;)
+# Note that this file is being sourced, so be carefull with what you put there
 
 # Default output
 defaultparams=\"$defaultparams\"
@@ -148,7 +149,7 @@ main_get_data () {
         jobstate=$(awk '{print $1}' <<<$line)
         jobid=$(awk '{print $2}' <<<$line)
         [[ "$debug" ]] || jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
-        [[ "$debug" ]] && jobinfo=$(cat ~/$jobid)
+        [[ "$debug" ]] && jobinfo=$(cat ~/$jobid | sed 's/ /\n/g')
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
@@ -173,7 +174,7 @@ main_get_data () {
 
 
         isrefresco="y"
-        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout")
+        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout" 2> /dev/null)
 
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
@@ -182,8 +183,9 @@ main_get_data () {
             controls=$(cat "$controlspath")
             residuals=$( (head; tail) < "$residualspath")
 
-            reportgeneral=$(cat "$dir"/report_general.xml)'</log>'
+            reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed '/^.*<log>$/,$ d' | tac)'</log>'
             nCells=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/topology_info/topology_file/nIntCells/total' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
+
             if [[ "$nCells" ]]
             then
                 mem=$(bc <<<"$nCells * $MemFactor *1.048576/$jobcore") # Memory in K
@@ -200,10 +202,7 @@ main_get_data () {
                 currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $2}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
 
-                boolrestart=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/restart' | grep -m 1 true)
-                boolresetcount=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/resetCounter' | grep -m 1 false)
-
-                [ -n "$boolrestart" -a -n "$boolresetcount" ] && initialtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/restart/restartFileName' | sed 's/[^0-9]//g;2p' -n)
+                initialtimestep=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/counters_info/start_time_step' | sed 's/[^0-9]//g;2p' -n)
 
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
