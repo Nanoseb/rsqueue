@@ -202,7 +202,7 @@ main_get_data () {
                 currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $2}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
 
-                initialtimestep=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/counters_info/start_time_step' | sed 's/[^0-9]//g;2p' -n)
+                initialtimestep=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/counters_info/start_time_step' 2> /dev/null| sed 's/[^0-9]//g;2p' -n)
 
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
@@ -431,14 +431,13 @@ partition_sub () {
 
 stopcomputation_sub () {
     [ -z $jobid_d ] && echo "Error: no jobID given" && exit 1
-    state=$(scontrol show job $jobid_d | grep -m 1 "^\ *JobState=" | sed 's/^[^=]*=//')
+    state=$(scontrol show job $jobid_d | sed 's/ /\n/g' | grep -m 1 "^\ *JobState=" | sed 's/^[^=]*=//')
     if [ "$state" == "RUNNING" ]
     then
         dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
         [ -z "$dir" ] && exit 1
 
-        touch "$dir"/stopfile
-        [ $? ] || echo stopfile written to "$dir"
+        touch "$dir"/stopfile && echo stopfile written to "$dir"
     else
         echo "Job not running, launching 'scancel $jobid_d'"
         scancel "$jobid_d"
