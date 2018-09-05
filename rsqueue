@@ -69,14 +69,14 @@ Tools:
 
   A configuration file can be used to overwrite some default parameters, it must be placed in ~/.config/rsqueue.conf, a default configuration file is available via the command --export-conf. 
 
-rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
+rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
 }
 
 version_sub () {
     echo "rsqueue version $version
 
-rsqueue is developed under MIT licence: feel free to contribute and give feedbacks!
+rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
 
 }
