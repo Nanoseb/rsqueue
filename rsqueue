@@ -641,6 +641,8 @@ do
 done
 
 main_nb_line=0
+# remove storage with -f
+#strg=0
 pendingJobsOld=""
 runningJobsOld=""
 
