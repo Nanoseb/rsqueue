@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.2"
+version="2.1.3"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -640,20 +640,21 @@ do
     echo
 done
 
-main_nb_line=0
-# remove storage with -f
-#strg=0
-pendingJobsOld=""
-runningJobsOld=""
-
 if [[ "$follow" ]] 
 then
+    main_nb_line=0
+    pendingJobsOld=""
+    runningJobsOld=""
+
+    # remove storage when using -f
+    strg=0
+
     while true;
     do
         var=$(printWHeader "$(main_sub)")
         erase $main_nb_line
-        main_nb_line=$(wc -l <<<"$var")
         echo "$var"
+        main_nb_line=$(wc -l <<<"$var")
 
         [ "$notif" ] && display-notif
         sleep "$refresh_time"
