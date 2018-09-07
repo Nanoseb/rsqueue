@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.3"
+version="2.1.4"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -318,6 +318,7 @@ main_sub () {
 
 
     echo -e "$data" |\
+        sed 's/;;/; ;/g;s/;;/; ;/g' |\
         column -t -s ';' |\
         sed -r 's/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2/;s/$/\x1b[0m/' |\
         sed 's/\(.\!.\)/\x1b[31m\1\x1b[0m/'
