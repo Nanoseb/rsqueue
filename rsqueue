@@ -318,7 +318,7 @@ main_sub () {
 
 
     echo -e "$data" |\
-        column -t -s ';' -o '  ' |\
+        column -t -s ';' |\
         sed -r 's/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2/;s/$/\x1b[0m/' |\
         sed 's/\(.\!.\)/\x1b[31m\1\x1b[0m/'
 
