@@ -183,7 +183,7 @@ main_get_data () {
             controls=$(cat "$controlspath")
             residuals=$( (head; tail) < "$residualspath")
 
-            reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed '/^.*<log>$/,$ d' | tac)'</log>'
+            reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed 's/grid size/grid_size/g' | sed '/^.*<log>$/,$ d' | tac)'</log>'
             nCells=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/topology_info/topology_file/nIntCells/total' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
 
             if [[ "$nCells" ]]
