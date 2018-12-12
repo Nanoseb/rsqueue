@@ -267,7 +267,7 @@ main_get_data () {
                 nowsizeh=$(convert_human $nowsize)
                 ETAsizetotal=$((nowsize + ETAsize + ETAsizetotal))
                 currentsizetotal=$((nowsize + currentsizetotal))
-                if [[ "$((ETAday))" -ge 1 ]]
+                if [[ "$((10#$ETAday))" -ge 1 ]]
                 then
                     ETA24hsize=$(bc <<<"$ETA24hsize + 86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
                 else
