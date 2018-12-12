@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.4"
+version="2.1.5"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -267,7 +267,7 @@ main_get_data () {
                 nowsizeh=$(convert_human $nowsize)
                 ETAsizetotal=$((nowsize + ETAsize + ETAsizetotal))
                 currentsizetotal=$((nowsize + currentsizetotal))
-                if [[ "$ETAday" -ge 1 ]]
+                if [[ "$((ETAday))" -ge 1 ]]
                 then
                     ETA24hsize=$(bc <<<"$ETA24hsize + 86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
                 else
@@ -275,6 +275,9 @@ main_get_data () {
                 fi
             fi
 
+
+            nprocs=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/nprocs' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
+            [[ "$nprocs" ]] && [[ "$nprocs" != "$jobcore" ]] && jobcore="$nprocs/$jobcore"
             echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
 
         else
@@ -424,7 +427,7 @@ userl_sub () {
 partition_sub () {
 #    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
 #    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
-    echo "Partition,Total,Used,Error,Available,Usage"
+    echo "Partition,Total,Used,Down,Available,Usage"
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
      $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
 }
