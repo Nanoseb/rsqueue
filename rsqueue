@@ -1,9 +1,9 @@
 #!/bin/bash
 # Script used to monitor jobs and refresco running instances more particularly
-# For Marclus3 and Marclus4
+# For Marclus3 and Marclus4 (or any slurm based cluster)
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.5"
+version="2.1.6"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -346,7 +346,7 @@ gen_tree () {
     head -n 1 <<<"$data"
     content=$(tail -n +2 <<<"$data" | sort -n)
     prevdir=""
-    while read line
+    echo -e "$content" | while read line
     do
         currentdir=$(awk -F'/' '{print $1}' <<<"$line")
         if [[ "$currentdir" == "$prevdir" ]]
@@ -355,9 +355,9 @@ gen_tree () {
             sed "s/^$currentdir/$newdir/" <<<"$line"
         else
             prevdir="$currentdir"
-            echo "$line"
+            echo -e "$line"
         fi
-    done <<<"$content"
+    done
 
 }
 
