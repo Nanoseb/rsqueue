@@ -19,6 +19,7 @@ memfield=1
 runonly=0
 project_number=1
 cpuhcost=0.05
+tree=0
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -51,6 +52,7 @@ Output tweaking:
   --st                     Sort job list by start time
   --pn                     Don't print the project number in the job name
   --node                   Print the nodes being used in the -u output
+  --tree                   Print subdirectories path in first column in a tree like form
 
 Tools:
   -d [jobID]               Print the working directory of the specified JobID
@@ -117,6 +119,9 @@ runonly=$runonly
 
 # Print project number (1=true, 0=false)
 project_number=$project_number
+
+# Print tree like directories in 1st column (1=true, 0=false)
+tree=$tree
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -159,6 +164,7 @@ main_get_data () {
         jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
+        dirp2=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $(NF-1)')
         # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
 
         if [ "$project_number" = 1 ]
@@ -278,7 +284,7 @@ main_get_data () {
 
             nprocs=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/nprocs' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
             [[ "$nprocs" ]] && [[ "$nprocs" != "$jobcore" ]] && jobcore="$nprocs/$jobcore"
-            echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
+            echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
 
         else
             refresco=''
@@ -290,7 +296,7 @@ main_get_data () {
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
                 reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
-                echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
+                echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
             fi
         fi
     done <<< "$(squeue -S $sort -h -u $USER -o "%T %i")"
@@ -305,20 +311,25 @@ main_sub () {
     storage=$(sed -n '/^$/,$p' <<<"$data")
     data=$(sed '/^$/,+3d' <<<"$data")
 
-    [ "$debug" ] && data="$data"$'\n'"$(seq 15 | tr "\n" ";")"
+    [ "$debug" ] && data="$data"$'\n'"$(seq 16 | tr "\n" ";")"
 
     # remove maxit
-    [ "$maxit" != 1 ] && data=$(sed 's/[^;]*;//14' <<<"$data")
+    [ "$maxit" != 1 ] && data=$(sed 's/[^;]*;//15' <<<"$data")
 
     # remove cost
-    [ "$cost" != 1 ] && data=$(sed 's/[^;]*;//9' <<<"$data")
+    [ "$cost" != 1 ] && data=$(sed 's/[^;]*;//10' <<<"$data")
 
     # remove memory 
-    [ "$memfield" != 1 ] && data=$(sed 's/[^;]*;//8' <<<"$data")
+    [ "$memfield" != 1 ] && data=$(sed 's/[^;]*;//9' <<<"$data")
 
     # remove storage
-    [ "$strg" != 1 ] && data=$(sed 's/[^;]*;//6' <<<"$data")
+    [ "$strg" != 1 ] && data=$(sed 's/[^;]*;//7' <<<"$data")
 
+    # remove full dir
+    [ "$tree" != 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
+    [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//2' <<<"$data")
+
+    [ "$tree" == 1 ] && data=$(gen_tree "$data")
 
     echo -e "$data" |\
         sed 's/;;/; ;/g;s/;;/; ;/g' |\
@@ -329,6 +340,26 @@ main_sub () {
     echo "$storage"
 }
 
+gen_tree () {
+    data="$1"
+
+    head -n 1 <<<"$data"
+    content=$(tail -n +2 <<<"$data" | sort -n)
+    prevdir=""
+    while read line
+    do
+        currentdir=$(awk -F'/' '{print $1}' <<<"$line")
+        if [[ "$currentdir" == "$prevdir" ]]
+        then
+            newdir=$(sed 's/./ /g' <<<"$currentdir")
+            sed "s/^$currentdir/$newdir/" <<<"$line"
+        else
+            prevdir="$currentdir"
+            echo "$line"
+        fi
+    done <<<"$content"
+
+}
 
 storage_sub () {
     echo
@@ -559,6 +590,10 @@ do
             ;;
         --memory)
             memfield=0
+            shift
+            ;;
+        --tree)
+            tree=1
             shift
             ;;
         -f|--follow)
