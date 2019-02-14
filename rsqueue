@@ -139,7 +139,7 @@ gen_line() {
 
 main_get_data () {
     
-    echo "Directory;Job name;Job-ID;Cores;Iterations;Storage;%;Mem/Core;Cost;Start time;\e[0m;ETA;Time left;Max job It;"
+    echo "Directory;Directory;Job name;Job-ID;Cores;Iterations;Storage;%;Mem/Core;Cost;Start time;\e[0m;ETA;Time left;Max job It;"
 
     ETA24hsize=0
     ETAsizetotal=0
@@ -164,7 +164,7 @@ main_get_data () {
         jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
-        dirp2=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $(NF-1)')
+        dirp2=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $(NF-1)}')
         # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
 
         if [ "$project_number" = 1 ]
