@@ -374,7 +374,7 @@ storage_sub () {
 count_sub () {
     echo -e "\e[34m\e[4mUsed CPUs per user:\e[0m"
     list=$(squeue -t R -h -o "%u %C")
-    users_c=$(cut -f1 <<<"$list" | sort | uniq)
+    users_c=$(cut -f1 -d' ' <<<"$list" | sort | uniq)
     used_core=$(awk '{s+=$2} END {print s}' <<<"$list")
     nb_user=$(squeue -h -o  "%u" | sort -u | wc -l)
     avg=$(bc <<<"$used_core / $nb_user")
@@ -395,7 +395,7 @@ count_sub () {
 top_sub () {
 
     list=$(squeue -t R -h -o "%u %D %C %P")
-    users_t=$(cut -f1 <<<"$list" | sort -u)
+    users_t=$(cut -f1 -d' ' <<<"$list" | sort -u)
     echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     while read user
     do
@@ -403,7 +403,7 @@ top_sub () {
         nbjob=$(wc -l <<<"$userlist")
         core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
         node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
-        partition=$(cut -f4 <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
+        partition=$(cut -f4 -d' ' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
         echo $user $nbjob $node $core $partition
 
     done <<<"$users_t" | sort -n -k 4 -r
@@ -411,14 +411,14 @@ top_sub () {
     if [ "$runonly" = "0" ]
     then
         list=$(squeue -t PD -h -o "%u %D %C %P")
-        users_t=$(cut -f1 <<<"$list" | sort -u)
+        users_t=$(cut -f1 -d' ' <<<"$list" | sort -u)
         while read user
         do
             userlist=$(grep ^$user\  <<<"$list")
             nbjob=$(wc -l <<<"$userlist")
             core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
             node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
-            partition=$(cut -f4 <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
+            partition=$(cut -f4 -d' ' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
             echo "$user $nbjob pending $core $partition"
 
         done <<<"$users_t" | sort -n -k 4 -r
