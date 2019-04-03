@@ -156,10 +156,10 @@ main_get_data () {
         [[ "$debug" ]] || jobinfo=$(scontrol show job $jobid)
         [[ "$debug" ]] && jobinfo=$(cat ~/$jobid)
         jobinfo=${jobinfo//\ /'\n'}
-        jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | awk -F"=" '{print $2}')
+        jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | cut -d= -f2)
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
-        jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
-        jobtime=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | awk -F"T" '{print $3}' | sed 's/:..$//')
+        jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | cut -d= -f2 | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
+        jobtime=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | cut -dT -f3 | sed 's/:..$//')
 
         #jobfile=$(grep -m 1 "^Command=" <<<"$jobinfo" | awk -F"=" '{print $2}')
         jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
@@ -230,7 +230,7 @@ main_get_data () {
             #jobdate=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $3}' | sed 's/\./\//g')
             #jobtime=$(head -n 5 "$jobout" | sed '5!d' | awk '{print $4}')
 
-            jobtimelimit=$(grep -m 1 "^TimeLimit=" <<<"$jobinfo" | awk -F"=" '{print $2}' | sed 's/-/:/' | sed 's/^\(..:..:..\)$/0:\1/' | awk -F":" '{print $4+$3*60+$2*3600+$1*86400}')
+            jobtimelimit=$(grep -m 1 "^TimeLimit=" <<<"$jobinfo" | cut -d= -f2 | sed 's/-/:/' | sed 's/^\(..:..:..\)$/0:\1/' | awk -F":" '{print $4+$3*60+$2*3600+$1*86400}')
             startday=$(awk -F"/" '{print $3 "/" $2 "/" $1}' <<<$jobdate)
             starthour=$jobtime
             startepoch=$(date -d "$startday $starthour" +%s)
@@ -268,7 +268,7 @@ main_get_data () {
             ETAsizeh=""
             if [ "$strg" = "1" ]
             then
-                nowsize=$(du -s "$dir" | awk '{print $1}')
+                nowsize=$(du -s "$dir" | cut -f1)
                 ETAsize=$(bc <<<"($maxtimestep - $currentstep)*($nowsize)/($currentstep-$initialtimestepf)")
                 ETAsizeh=$(convert_human $(bc <<<"$ETAsize+$nowsize"))
                 nowsizeh=$(convert_human $nowsize)
@@ -374,7 +374,7 @@ storage_sub () {
 count_sub () {
     echo -e "\e[34m\e[4mUsed CPUs per user:\e[0m"
     list=$(squeue -t R -h -o "%u %C")
-    users_c=$(awk '{print $1}' <<<"$list" | sort | uniq)
+    users_c=$(cut -f1 <<<"$list" | sort | uniq)
     used_core=$(awk '{s+=$2} END {print s}' <<<"$list")
     nb_user=$(squeue -h -o  "%u" | sort -u | wc -l)
     avg=$(bc <<<"$used_core / $nb_user")
@@ -395,7 +395,7 @@ count_sub () {
 top_sub () {
 
     list=$(squeue -t R -h -o "%u %D %C %P")
-    users_t=$(awk '{print $1}' <<<"$list" | sort -u)
+    users_t=$(cut -f1 <<<"$list" | sort -u)
     echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     while read user
     do
@@ -403,7 +403,7 @@ top_sub () {
         nbjob=$(wc -l <<<"$userlist")
         core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
         node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
-        partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
+        partition=$(cut -f4 <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
         echo $user $nbjob $node $core $partition
 
     done <<<"$users_t" | sort -n -k 4 -r
@@ -411,14 +411,14 @@ top_sub () {
     if [ "$runonly" = "0" ]
     then
         list=$(squeue -t PD -h -o "%u %D %C %P")
-        users_t=$(awk '{print $1}' <<<"$list" | sort -u)
+        users_t=$(cut -f1 <<<"$list" | sort -u)
         while read user
         do
             userlist=$(grep ^$user\  <<<"$list")
             nbjob=$(wc -l <<<"$userlist")
             core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
             node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
-            partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
+            partition=$(cut -f4 <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
             echo "$user $nbjob pending $core $partition"
 
         done <<<"$users_t" | sort -n -k 4 -r
