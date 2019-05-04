@@ -20,6 +20,7 @@ runonly=0
 project_number=1
 cpuhcost=0.05
 tree=0
+residuals_detail=0
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -53,6 +54,7 @@ Output tweaking:
   --pn                     Don't print the project number in the job name
   --node                   Print the nodes being used in the -u output
   --tree                   Print subdirectories path in first column in a tree like form
+  --residuals              Print a detail view of the residuals for each running computation
 
 Tools:
   -d [jobID]               Print the working directory of the specified JobID
@@ -122,6 +124,9 @@ project_number=$project_number
 
 # Print tree like directories in 1st column (1=true, 0=false)
 tree=$tree
+
+# Print residuals detail (1=true, 0=false)
+residuals_detail=$residuals_detail
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -281,10 +286,16 @@ main_get_data () {
                 fi
             fi
 
+            if [ "$residuals_detail" = "1" ]
+                ResidualOutput=@@$(get_residuals "$residuals" | sed ':a;N;$!ba;s/\n/@@/g')
+            else
+                ResidualOutput=""
+            fi
+
 
             nprocs=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/nprocs' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
             [[ "$nprocs" ]] && [[ "$nprocs" != "$jobcore" ]] && jobcore="$nprocs/$jobcore"
-            echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
+            echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;$ResidualOutput"
 
         else
             refresco=''
@@ -334,11 +345,28 @@ main_sub () {
     echo -e "$data" |\
         sed 's/;;/; ;/g;s/;;/; ;/g' |\
         column -t -s ';' |\
+        sed 's/@@/\n/g' |\
         sed -r 's/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2/;s/$/\x1b[0m/' |\
         sed 's/\(.\!.\)/\x1b[31m\1\x1b[0m/'
 
     echo "$storage"
 }
+
+get_residuals () {
+
+    header=$(sed '2!d;s/" "/\n/g' <(echo "$1") | grep 'Linf_' | sed 's/"//;s/Linf_/;/')
+    nb=$(wc -l <<<$header)
+    residualLinf=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-nb+1;i<=NF;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
+    residualL2=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-2*nb+1;i<=NF-nb;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
+
+    paste <(echo '  └───> L2' "$header") \
+          <(echo "$residualL2") \
+          <(echo '  ──> Linf' "$header") \
+          <(echo "$residualLinf")  --delimiters ';' |\
+          column -t -s ';'
+
+}
+
 
 gen_tree () {
     data="$1"
@@ -594,6 +622,10 @@ do
             ;;
         --tree)
             tree=1
+            shift
+            ;;
+        --residuals)
+            residuals_detail=1
             shift
             ;;
         -f|--follow)
