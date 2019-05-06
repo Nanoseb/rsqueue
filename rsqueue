@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4 (or any slurm based cluster)
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.6"
+version="2.1.7"
 
 # default parameters
 allparams="-u -t -p -i"
