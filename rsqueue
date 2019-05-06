@@ -3,7 +3,7 @@
 # For Marclus3 and Marclus4 (or any slurm based cluster)
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.7"
+version="2.1.8"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -422,9 +422,14 @@ count_sub () {
 
 top_sub () {
 
+    echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
+    if [[ $(command -v slurmtop) ]]
+    then
+        slurmtop -f - -i 1 | tail -n +7 | sed '/^$/d'
+        exit 0
+    fi
     list=$(squeue -t R -h -o "%u %D %C %P")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
-    echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     while read user
     do
         userlist=$(grep ^$user\  <<<"$list")
