@@ -341,7 +341,7 @@ main_sub () {
     [ "$tree" != 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
     [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//2' <<<"$data")
 
-    [ "$tree" == 1 ] && data=$(gen_tree "$data")
+    [ "$tree" == 1 ] && [ "$residuals_detail" != 1 ] && data=$(gen_tree "$data")
 
     echo -e "$data" |\
         sed 's/;;/; ;/g;s/;;/; ;/g' |\
