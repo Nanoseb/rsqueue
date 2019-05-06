@@ -355,8 +355,8 @@ main_sub () {
 
 get_residuals () {
 
-    header=$(sed '2!d;s/" "/\n/g' <(echo "$1") | grep 'Linf_' | sed 's/"//;s/Linf_/;/')
-    nb=$(wc -l <<<$header)
+    header=$(sed '2!d;s/" "/\n/g' <(echo "$1") | grep 'Linf_' | sed 's/"//;s/Linf_/ ;/')
+    nb=$(wc -l <<<"$header")
     residualLinf=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-nb+1;i<=NF;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
     residualL2=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-2*nb+1;i<=NF-nb;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
 
