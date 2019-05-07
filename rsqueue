@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script used to monitor jobs and refresco running instances more particularly
-# For Marclus3 and Marclus4 (or any slurm based cluster)
+# For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
 version="2.1.8"
@@ -12,7 +12,6 @@ defaultparams="-i"
 
 strg=1
 cost=0
-[[ "$(hostname | cut -c8)" == "4" ]] &&  cost=1
 
 maxit=0
 memfield=1
@@ -393,7 +392,6 @@ gen_tree () {
 storage_sub () {
     echo
     echo Total disk space needed: $(convert_human $ETAsizetotal)
-    # [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
 
 }
@@ -490,8 +488,6 @@ userl_sub () {
 
 
 partition_sub () {
-#    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
-#    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
     echo "Partition,Total,Used,Down,Available,Usage"
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
      $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
