@@ -630,7 +630,7 @@ do
             tree=1
             shift
             ;;
-        --residuals)
+        --residuals|--portuguese-language)
             residuals_detail=1
             shift
             ;;
