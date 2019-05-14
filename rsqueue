@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.8"
+version="2.1.9"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -20,6 +20,8 @@ project_number=1
 cpuhcost=0.05
 tree=0
 residuals_detail=0
+progress_bar=0
+progress_bar_length=10
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -54,6 +56,7 @@ Output tweaking:
   --node                   Print the nodes being used in the -u output
   --tree                   Print subdirectories path in first column in a tree like form
   --residuals              Print a detailed view of the residuals for each running computation
+  --progress-bar           Print the computation progress graphically 
 
 Tools:
   -d [jobID]               Print the working directory of the specified JobID
@@ -126,6 +129,12 @@ tree=$tree
 
 # Print residuals detail (1=true, 0=false)
 residuals_detail=$residuals_detail
+
+# Print a progress bar (1=true, 0=false)
+progress_bar=$progress_bar
+
+# Length of the progress bar
+progress_bar_length=$progress_bar_length
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -139,6 +148,14 @@ convert_human() {
 
 gen_line() {
     printf "%${1}s\n" "" | sed 's/\ /─/g'
+}
+
+gen_progress_bar() {
+    progress=$(echo -e "$1 * $progress_bar_length / 100" | bc)
+    remaining=$((progress_bar_length-progress))
+    progress_char=$(printf "%${progress}s\n" "" | sed s/\ /"█"/g)
+    remaining_char=$(printf "%${remaining}s\n" "" | sed s/\ /─/g)
+    echo ${progress_char}${remaining_char} $1
 }
 
 main_get_data () {
@@ -259,6 +276,7 @@ main_get_data () {
             [ "$ETAepoch" ] && [ "$((startepoch + jobtimelimit))" -lt "$ETAepoch" ] && colortime='\e[31m'
 
             percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
+            [ "$progress_bar" = "1" ] && percent="$(gen_progress_bar $percent)"
 
 
             costETA=$(bc <<<"$cpuhcost*$jobcore*($ETAepoch-$startepoch)/3600")
@@ -628,6 +646,10 @@ do
             ;;
         --residuals|--portuguese-language)
             residuals_detail=1
+            shift
+            ;;
+        --progress-bar)
+            progress_bar=1
             shift
             ;;
         -f|--follow)
