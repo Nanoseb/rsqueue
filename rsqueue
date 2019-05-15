@@ -174,9 +174,9 @@ main_get_data () {
         # Gathering of job metadata
         jobstate=${line%% *}
         jobid=${line##* }
-        [[ "$debug" ]] || jobinfo=$(scontrol show job $jobid)
-        [[ "$debug" ]] && jobinfo=$(cat ~/$jobid)
-        jobinfo=${jobinfo//\ /'\n'}
+        [[ "$debug" ]] || jobinfo=$(scontrol show job $jobid | sed 's/ /\n/g')
+        [[ "$debug" ]] && jobinfo=$(cat ~/$jobid | sed 's/ /\n/g')
+
         jobcore=$(grep -m 1 "^NumCPUs=" <<<"$jobinfo" | cut -d= -f2)
         jobname=$(grep -m 1 "^JobName=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         jobdate=$(grep -m 1 "^StartTime=" <<<"$jobinfo" | cut -d= -f2 | sed 's/T.*$//' | awk -F"-" '{print $3 "/" $2 "/" $1}')
