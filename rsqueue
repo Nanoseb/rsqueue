@@ -1,9 +1,9 @@
 #!/bin/bash
 # Script used to monitor jobs and refresco running instances more particularly
-# For Marclus3 and Marclus4 (or any slurm based cluster)
+# For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.8"
+version="2.1.9"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -12,7 +12,6 @@ defaultparams="-i"
 
 strg=1
 cost=0
-[[ "$(hostname | cut -c8)" == "4" ]] &&  cost=1
 
 maxit=0
 memfield=1
@@ -21,6 +20,8 @@ project_number=1
 cpuhcost=0.05
 tree=0
 residuals_detail=0
+progress_bar=0
+progress_bar_length=10
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -54,7 +55,8 @@ Output tweaking:
   --pn                     Don't print the project number in the job name
   --node                   Print the nodes being used in the -u output
   --tree                   Print subdirectories path in first column in a tree like form
-  --residuals              Print a detail view of the residuals for each running computation
+  --residuals              Print a detailed view of the residuals for each running computation
+  --progress-bar           Print the computation progress graphically 
 
 Tools:
   -d [jobID]               Print the working directory of the specified JobID
@@ -127,6 +129,12 @@ tree=$tree
 
 # Print residuals detail (1=true, 0=false)
 residuals_detail=$residuals_detail
+
+# Print a progress bar (1=true, 0=false)
+progress_bar=$progress_bar
+
+# Length of the progress bar
+progress_bar_length=$progress_bar_length
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -140,6 +148,14 @@ convert_human() {
 
 gen_line() {
     printf "%${1}s\n" "" | sed 's/\ /─/g'
+}
+
+gen_progress_bar() {
+    progress=$(echo -e "$1 * $progress_bar_length / 100" | bc)
+    remaining=$((progress_bar_length-progress))
+    progress_char=$(printf "%${progress}s\n" "" | sed s/\ /"█"/g)
+    remaining_char=$(printf "%${remaining}s\n" "" | sed s/\ /─/g)
+    echo ${progress_char}${remaining_char} $1
 }
 
 main_get_data () {
@@ -261,6 +277,7 @@ main_get_data () {
             [ "$ETAepoch" ] && [ "$((startepoch + jobtimelimit))" -lt "$ETAepoch" ] && colortime='\e[31m'
 
             percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
+            [ "$progress_bar" = "1" ] && percent="$(gen_progress_bar $percent)"
 
 
             costETA=$(bc <<<"$cpuhcost*$jobcore*($ETAepoch-$startepoch)/3600")
@@ -289,7 +306,7 @@ main_get_data () {
 
             if [ "$residuals_detail" = "1" ]
             then
-                ResidualOutput=@@$(get_residuals "$residuals" | sed ':a;N;$!ba;s/\n/@@/g')
+                ResidualOutput=@@$(get_residuals "$residuals" | sed ':a;N;$!ba;s/\n/@@/g')@@
             else
                 ResidualOutput=""
             fi
@@ -394,7 +411,6 @@ gen_tree () {
 storage_sub () {
     echo
     echo Total disk space needed: $(convert_human $ETAsizetotal)
-    # [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
 
 }
@@ -491,8 +507,6 @@ userl_sub () {
 
 
 partition_sub () {
-#    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
-#    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
     echo "Partition,Total,Used,Down,Available,Usage"
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
      $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
@@ -633,6 +647,10 @@ do
             ;;
         --residuals|--portuguese-language)
             residuals_detail=1
+            shift
+            ;;
+        --progress-bar)
+            progress_bar=1
             shift
             ;;
         -f|--follow)

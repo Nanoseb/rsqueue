@@ -25,7 +25,8 @@ Output tweaking:
   --pn                     Don't print the project number in the job name
   --node                   Print the nodes being used in the -u output
   --tree                   Print subdirectories path in first column in a tree like form
-  --residuals              Print a detail view of the residuals for each running computation
+  --residuals              Print a detailed view of the residuals for each running computation
+  --progress-bar           Print the computation progress graphically 
 
 Tools:
   -d [jobID]               Print the working directory of the specified JobID
