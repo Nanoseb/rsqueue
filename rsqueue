@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.9"
+version="2.1.10"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -22,6 +22,7 @@ tree=0
 residuals_detail=0
 progress_bar=0
 progress_bar_length=10
+use_slurmtop=0
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -135,6 +136,9 @@ progress_bar=$progress_bar
 
 # Length of the progress bar
 progress_bar_length=$progress_bar_length
+
+# Use slurmtop command output for -t when available (1=true, 0=false)
+use_slurmtop=$use_slurmtop 
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -439,7 +443,7 @@ count_sub () {
 top_sub () {
 
     echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
-    if [[ $(command -v slurmtop) ]]
+    if [[ "$use_slurmtop" == 1 && $(command -v slurmtop) ]]
     then
         slurmtop -f - -i 1 | tail -n +7 | sed '/^$/d'
         exit 0
