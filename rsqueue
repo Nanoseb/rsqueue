@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.10"
+version="2.1.11"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -17,7 +17,7 @@ maxit=0
 memfield=1
 runonly=0
 project_number=1
-cpuhcost=0.05
+cpuhcost=0.03
 tree=0
 residuals_detail=0
 progress_bar=0
@@ -430,7 +430,7 @@ count_sub () {
     while read user
     do
         nb=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
-        if [ "$nb" -gt "$avg" ]
+        if [[ "$nb" -gt "$avg" ]]
         then
             echo -e "$user: \e[31m$nb\e[0m"
         else
