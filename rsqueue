@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.11"
+version="2.1.12"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -442,13 +442,23 @@ count_sub () {
 
 top_sub () {
 
-    echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     if [[ "$use_slurmtop" == 1 && $(command -v slurmtop) ]]
     then
+        echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
         slurmtop -f - -i 1 | tail -n +7 | sed '/^$/d'
         exit 0
+    else
+        if [ "$cost" == 1 ]
+        then
+            sort_column=5
+            echo "User Nb_Jobs Nb_Nodes Nb_CPU Cost Partitions"
+        else
+            cpuhour_cost=""
+            sort_column=4
+            echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     fi
-    list=$(squeue -t R -h -o "%u %D %C %P")
+    fi
+    list=$(squeue -t R -h -o "%u %D %C %P %l")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
     while read user
     do
@@ -456,14 +466,19 @@ top_sub () {
         nbjob=$(wc -l <<<"$userlist")
         core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
         node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+        if [ "$cost" == 1 ]
+        then
+            cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | sed 's/-/:/' |\
+                sed 's/^\([0-9]*:..:..\)\ /0:\1\ /' | sed 's/\ /:/' | awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+        fi
         partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
-        echo $user $nbjob $node $core $partition
+        echo $user $nbjob $node $core $cpuhour_cost $partition
 
-    done <<<"$users_t" | sort -n -k 4 -r
+    done <<<"$users_t" | sort -n -k $sort_column -r
 
     if [ "$runonly" = "0" ]
     then
-        list=$(squeue -t PD -h -o "%u %D %C %P")
+        list=$(squeue -t PD -h -o "%u %D %C %P %l")
         users_t=$(awk '{print $1}' <<<"$list" | sort -u)
         while read user
         do
@@ -471,10 +486,15 @@ top_sub () {
             nbjob=$(wc -l <<<"$userlist")
             core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
             node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+            if [ "$cost" == 1 ]
+            then
+                cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | sed 's/-/:/' |\
+                    sed 's/^\([0-9]*:..:..\)\ /0:\1\ /' | sed 's/\ /:/' | awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+            fi
             partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
-            echo "$user $nbjob pending $core $partition"
+            echo "$user $nbjob pending $core $cpuhour_cost $partition"
 
-        done <<<"$users_t" | sort -n -k 4 -r
+        done <<<"$users_t" | sort -n -k $sort_column -r
     fi
 
 }
