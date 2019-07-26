@@ -205,7 +205,7 @@ main_get_data () {
 
 
         isrefresco="y"
-        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout" 2> /dev/null)
+        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^\ *# ReFRESCO " "$jobout" 2> /dev/null)
 
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
