@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.13"
+version="2.1.14"
 
 # default parameters
 allparams="-u -t -p -i"
@@ -202,6 +202,7 @@ main_get_data () {
         [ -d "$dir" ] || continue
         controlspath="$dir"/controls.xml
         residualspath="$dir"/residuals.dat
+        counterspath="$dir"/counters.dat
 
 
         isrefresco="y"
@@ -212,7 +213,13 @@ main_get_data () {
         then
 
             controls=$(cat "$controlspath")
-            residuals=$( (head; tail) < "$residualspath")
+            # compatibility when counters are in residuals.dat file
+            if [ -e "$counterspath" ]
+            then
+                counters=$( (head; tail) < "$counterspath")
+            else
+                counters=$( (head; tail) < "$residualspath")
+            fi
 
             reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed 's/grid size/grid_size/g' | sed '/^.*<log>$/,$ d' | tac)'</log>'
             nCells=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/topology_info/topology_file/nIntCells/total' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
@@ -230,7 +237,7 @@ main_get_data () {
             unsteady=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
             if [ "$unsteady" ]
             then
-                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $2}' | sed 's/[^0-9]//g')
+                currentstep=$(tail -n 1 <(echo "$counters") | awk '{print $2}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
 
                 initialtimestep=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/counters_info/start_time_step' 2> /dev/null| sed 's/[^0-9]//g;2p' -n)
@@ -238,14 +245,14 @@ main_get_data () {
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
                 outermax=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
-                outercurrent=$(tail -n 1 <(echo "$residuals") | awk '{print $3}')
+                outercurrent=$(tail -n 1 <(echo "$counters") | awk '{print $3}')
                 [ "$outermax" = "$outercurrent" ] && outerwarn="!"
             else
-                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $1}' | sed 's/[^0-9]//g')
+                currentstep=$(tail -n 1 <(echo "$counters") | awk '{print $1}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
             fi
 
-            initialtimestepf=$(head -n 3 <(echo "$residuals") | sed '3!d' | awk '{print $2}')
+            initialtimestepf=$(head -n 3 <(echo "$counters") | sed '3!d' | awk '{print $2}')
             [ -z "$initialtimestepf" ] && initialtimestepf=$initialtimestep
 
             [ -z "$currentstep" ] && currentstep=$(bc <<<"$initialtimestep +1")
@@ -309,6 +316,7 @@ main_get_data () {
 
             if [ "$residuals_detail" = "1" ]
             then
+                residuals=$( (head -n 3; tail -n 2) < "$residualspath")
                 ResidualOutput=@@$(get_residuals "$residuals" | sed ':a;N;$!ba;s/\n/@@/g')@@
             else
                 ResidualOutput=""
