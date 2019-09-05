@@ -3,18 +3,18 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.14"
+version="2.2.0"
 
 # default parameters
-allparams="-u -t -p -i"
+allparams="-u -t -p -i --maxit --progress-bar"
 defaultparams="-i"
 
 
-strg=1
+strg=0
 cost=0
 
 maxit=0
-memfield=1
+memfield=0
 runonly=0
 project_number=1
 cpuhcost=0.03
@@ -47,10 +47,10 @@ Outputs:
   -a / --all               Print (almost) everything (equivalent of: rsqueue $allparams)
 
 Output tweaking:
-  -s                       Don't print the storage needed for simulations (speed up output)
+  -s / --storage           Print the storage needed for simulations (slows down the output)
   -r                       Print only running jobs
   --cost                   Print the current and final cost of the job 
-  --memory                 Hide the memory/core column
+  --memory                 Print an estimation of the memory/core based on the cell count
   --maxit                  Print the maximum iteration number possible within the job time limit
   --st                     Sort job list by start time
   --pn                     Don't print the project number in the job name
@@ -607,8 +607,8 @@ do
             params="$params -i"
             shift
             ;;
-        -s)
-            strg=0
+        -s|--storage)
+            strg=1
             shift
             ;;
         -r)
@@ -669,7 +669,7 @@ do
             shift
             ;;
         --memory)
-            memfield=0
+            memfield=1
             shift
             ;;
         --tree)

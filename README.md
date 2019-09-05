@@ -16,10 +16,10 @@ Outputs:
   -a / --all               Print (almost) everything (equivalent of: rsqueue -u -t -p -i)
 
 Output tweaking:
-  -s                       Don't print the storage needed for simulations (speed up output)
+  -s / --storage           Print the storage needed for simulations (slows down the output)
   -r                       Print only running jobs
   --cost                   Print the current and final cost of the job 
-  --memory                 Hide the memory/core column
+  --memory                 Print an estimation of the memory/core based on the cell count
   --maxit                  Print the maximum iteration number possible within the job time limit
   --st                     Sort job list by start time
   --pn                     Don't print the project number in the job name
