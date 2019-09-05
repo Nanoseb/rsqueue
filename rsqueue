@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.2.0"
+version="2.2.1"
 
 # default parameters
 allparams="-u -t -p -i --maxit --progress-bar"
@@ -37,7 +37,7 @@ fi
 man_sub () {
     echo -e "Usage: rsqueue [OPTIONS]
 Outputs:
-  -i / --inf               Print detailed info about refresco job (default behaviour)
+  -i / --info              Print detailed info about refresco job (default behaviour)
                                A \"\e[31m!\e[0m\" will appear near the \"Iterations\" column if the calculation is not converging
                                The time left will turn red if the runtime specified in the jobfile is not long enough
   -u / --user ([users])    Print job info of all users (default) or from a comma separated list of users
