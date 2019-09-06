@@ -7,7 +7,7 @@ version="2.2.1"
 
 # default parameters
 allparams="-u -t -p -i --maxit --progress-bar"
-defaultparams="-i"
+defaultparams="-p -i"
 
 
 strg=0
@@ -75,6 +75,16 @@ Tools:
   The cost column is based on a price of $cpuhcost €/CPU h.
 
   A configuration file can be used to overwrite some default parameters, it must be placed in ~/.config/rsqueue.conf, a default configuration file is available via the command --export-conf. 
+
+  Suggestion of aliases to put in ~/.bashrc:
+    # Simple view:
+    alias q='rsqueue --part --info --cost --pn --maxit --progress-bar'
+
+    # Detailled view:
+    alias qd='rsqueue --part --info --cost --maxit --progress-bar --residuals --tree --storage'
+
+    # Cluster overview:
+    alias qa='rsqueue --all --progress-bar'
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
