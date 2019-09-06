@@ -11,7 +11,7 @@ _rsqueue()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     #  Basic arguments to complete
-    opts="--info --user --top --part --count -a --all --storage --run --cost --memory --maxit --st --pn --node --tree --residuals --progress-bar -d --stop --follow --notif --export-conf --version --help"
+    opts="--info -i --user -u --top -t --part -p --count -c --all -a --storage -s --run -r --cost --memory --maxit --st --pn --node --tree --residuals --progress-bar -dir -d --stop --follow -f --notif --export-conf --version -v --help -h"
 
 
     #  Dynamic completion of arguments
@@ -47,8 +47,12 @@ complete -F _rsqueue rsqueue
 
 # Function to move to a computation directory via its jobID
 qcd () {
-    echo "Moving to $1"
-    cd "$(rsqueue -d $1)"
+    local job_working_directory=$(rsqueue -d $1)
+    if [ -d "$job_working_directory" ]
+    then
+        echo "Moving to $job_working_directory"
+        cd "$job_working_directory"
+    fi
 }
 
 

@@ -522,7 +522,7 @@ wdir_sub () {
     if [ -z $jobid_d ]
     then
         jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
-        [ -z $jobid_d ] && echo "No jobID" && exit 1
+        [ -z $jobid_d ] && echo "No jobID" >&2 && exit 1
     fi
     dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
     [ -z "$dir" ] && echo . && exit 1
