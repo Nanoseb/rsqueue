@@ -438,7 +438,7 @@ storage_sub () {
 
 
 count_sub () {
-    echo -e "\e[34m\e[4mUsed CPUs per user:\e[0m"
+    echo -e "User Nb_CPU"
     list=$(squeue -t R -h -o "%u %C")
     users_c=$(awk '{print $1}' <<<"$list" | sort | uniq)
     used_core=$(awk '{s+=$2} END {print s}' <<<"$list")
@@ -450,9 +450,9 @@ count_sub () {
         nb=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
         if [[ "$nb" -gt "$avg" ]]
         then
-            echo -e "$user: \e[31m$nb\e[0m"
+            echo -e "$user \e[31m$nb\e[0m"
         else
-            echo -e "$user: $nb"
+            echo -e "$user $nb"
         fi
     done <<<"$users_c" | column -t
 }
@@ -762,7 +762,7 @@ do
     case $param in
         -i) [[ "$follow" ]] || printWHeader "$(main_sub)"
             ;;
-        -c) count_sub
+        -c) printWHeader "$(count_sub | column -t | sed 's/_/ /g')"
             ;;
         -d) wdir_sub
             ;;

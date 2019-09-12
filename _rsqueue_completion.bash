@@ -11,7 +11,8 @@ _rsqueue()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     #  Basic arguments to complete
-    opts="--info -i --user -u --top -t --part -p --count -c --all -a --storage -s --run -r --cost --memory --maxit --st --pn --node --tree --residuals --progress-bar -dir -d --stop --follow -f --notif --export-conf --version -v --help -h"
+    opts="--info -i --user -u --top -t --part -p --count -c --all -a --storage -s --run -r --cost --memory --maxit --st --pn \
+          --node --tree --residuals --progress-bar -dir -d --stop --follow -f --notif --export-conf --version -v --help -h"
 
 
     #  Dynamic completion of arguments
