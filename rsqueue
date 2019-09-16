@@ -474,7 +474,7 @@ top_sub () {
             cpuhour_cost=""
             sort_column=4
             echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
-    fi
+        fi
     fi
     list=$(squeue -t R -h -o "%u %D %C %P %l")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
@@ -524,7 +524,7 @@ wdir_sub () {
         jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
         [ -z $jobid_d ] && echo "No jobID" >&2 && exit 1
     fi
-    dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
+    dir=$(squeue -o "%i %Z" | grep -m 1 "^${jobid_d%%-*}\ "| sed 's/^[^\ ]*\ //')
     [ -z "$dir" ] && echo . && exit 1
     echo $dir
 }
