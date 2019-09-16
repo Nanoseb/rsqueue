@@ -6,7 +6,7 @@
 version="2.2.1"
 
 # default parameters
-allparams="-u -t -p -i --maxit --progress-bar"
+allparams="-u -t -p -i --progress-bar"
 defaultparams="-p -i"
 
 
@@ -84,7 +84,7 @@ Tools:
     alias qd='rsqueue --part --info --cost --maxit --progress-bar --residuals --tree --storage'
 
     # Cluster overview:
-    alias qa='rsqueue --all --progress-bar'
+    alias qa='rsqueue --all'
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
