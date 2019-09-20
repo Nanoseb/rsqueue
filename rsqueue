@@ -211,7 +211,7 @@ main_get_data () {
         dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
         dirpfull=$(awk -v ndir=$numdir -F'/' 'function max(a, b) {return a > b ? a: b}
-        {out=""; for(i=max(NF-ndir,2);i<=NF;i++){out=out"/"$i}; print out}' <<<"$dir" | sed 's/^\/home\/[^\/]*\//~\//;s/^\///')
+        {out=""; for(i=max(NF-ndir+1,2);i<=NF;i++){out=out"/"$i}; print out}' <<<"$dir" | sed 's/^\/home\/[^\/]*\//~\//;s/^\///')
 
 
         # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
