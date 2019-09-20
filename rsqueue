@@ -7,7 +7,7 @@ version="2.2.1"
 
 # default parameters
 allparams="-u -t -p -i --progress-bar"
-defaultparams="-p -i"
+defaultparams="-i"
 
 
 strg=0
@@ -85,6 +85,17 @@ Tools:
 
     # Cluster overview:
     alias qa='rsqueue --all'
+
+
+Associated tools:
+(available when sourcing _rsqueue_completion.bash)
+
+Usage: qcd [path]
+    Wrapper of cd with autocompletion of jobs working directories only
+
+Usage: jcd [jobID]
+    cd to jobID working directory
+
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
