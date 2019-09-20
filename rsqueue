@@ -55,7 +55,7 @@ Output tweaking:
   --st                     Sort job list by start time
   --pn                     Don't print the project number in the job name
   --node                   Print the nodes being used in the -u output
-  --tree                   Print subdirectories path in first column in a tree like form
+  --tree ([numdir]/all)    Print [numdir] number of subdirectories path in first column in a tree like form (default 2)
   --residuals              Print a detailed view of the residuals for each running computation
   --progress-bar           Print the computation progress graphically 
 
@@ -210,7 +210,10 @@ main_get_data () {
         jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
-        dirp2=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $(NF-1)}')
+        dirpfull=$(awk -v ndir=$numdir -F'/' 'function max(a, b) {return a > b ? a: b}
+        {out=""; for(i=max(NF-ndir,2);i<=NF;i++){out=out"/"$i}; print out}' <<<"$dir" | sed 's/^\/home\/[^\/]*\//~\//;s/^\///')
+
+
         # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
 
         if [ "$project_number" = 1 ]
@@ -346,7 +349,7 @@ main_get_data () {
 
             nprocs=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/nprocs' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
             [[ "$nprocs" ]] && [[ "$nprocs" != "$jobcore" ]] && jobcore="$nprocs/$jobcore"
-            echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;$ResidualOutput"
+            echo "$dirpfull;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;$ResidualOutput"
 
         else
             refresco=''
@@ -358,7 +361,7 @@ main_get_data () {
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
                 reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
-                echo "$dirp2/$dirp;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
+                echo "$dirpfull;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
             fi
         fi
     done <<< "$(squeue -S $sort -h -u $USER -o "%T %i")"
@@ -391,7 +394,7 @@ main_sub () {
     [ "$tree" != 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
     [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//2' <<<"$data")
 
-    [ "$tree" == 1 ] && [ "$residuals_detail" != 1 ] && data=$(gen_tree "$data")
+    [ "$tree" == 1 ] && [ "$residuals_detail" != 1 ] && [ "$numdir" == 2 ] && data=$(gen_tree "$data")
 
     echo -e "$data" |\
         sed 's/;;/; ;/g;s/;;/; ;/g' |\
@@ -694,6 +697,19 @@ do
             shift
             ;;
         --tree)
+            if [ -z "$2" ] || [ "${2:0:1}" = "-" ]
+            then
+                numdir=2
+            else
+                shift
+                if [ "$1" = "all" ]
+                then
+                    numdir=100
+                else
+                    numdir="$1"
+                fi
+            fi
+
             tree=1
             shift
             ;;
