@@ -622,6 +622,7 @@ erase () {
 }
 
 sort="-T,u,i"
+numdir=1
 
 
 while [[ $# -gt 0 ]]
