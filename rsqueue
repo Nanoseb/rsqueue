@@ -93,6 +93,10 @@ Associated tools:
 Usage: qcd [path]
     Wrapper of cd with autocompletion of jobs working directories only
 
+    -r / --running         Autocomplete only running jobs
+    -p / --pending         Autocomplete only pending jobs
+
+
 Usage: jcd [jobID]
     cd to jobID working directory
 

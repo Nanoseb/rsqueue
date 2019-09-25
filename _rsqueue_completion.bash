@@ -25,9 +25,12 @@ _rsqueue() {
             COMPREPLY=( $(compgen -W "${userlist}" -- ${cur}) )
             ;;
         -f|--follow)
-            local timelist="5 15 30 120"
+            local timelist="5 15 30 2m 5m"
 
             COMPREPLY=( $(compgen -W "${timelist} ${opts}" -- ${cur}) )
+            ;;
+        --tree)
+            COMPREPLY=( $(compgen -W "1 2 3 5 all" -- ${cur}) )
             ;;
         *)
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )  
@@ -66,9 +69,9 @@ complete -F _jcd jcd
 # qcd:
 # Wrapper of cd to more to a job working directory, autocompletion of only job directories
 qcd () {
-    if [ -d "$1" ]
+    if [ -d "${@: -1}" ]
     then
-        cd "$1"
+        cd "${@: -1}"
     fi
 }
 
@@ -91,7 +94,21 @@ _qcd() {
     fi
 
     cur="${COMP_WORDS[COMP_CWORD]}"
-    paths=$(squeue -u $USER -o "%Z" -h)
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case "${prev}" in
+        -r|--running)
+            paths=$(squeue -u $USER -o "%Z" -h -t RUNNING) 
+            ;;
+        -p|--pending)
+            paths=$(squeue -u $USER -o "%Z" -h -t PENDING) 
+            ;;
+        *)
+            paths=$(squeue -u $USER -o "%Z" -h)
+            ;;
+    esac
+
+
 
     COMPREPLY=( $(compgen -W "${paths}" -- ${cur}) )
     return 0
