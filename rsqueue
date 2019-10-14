@@ -93,6 +93,10 @@ Associated tools:
 Usage: qcd [path]
     Wrapper of cd with autocompletion of jobs working directories only
 
+    -r / --running         Autocomplete only running jobs
+    -p / --pending         Autocomplete only pending jobs
+
+
 Usage: jcd [jobID]
     cd to jobID working directory
 
@@ -551,7 +555,7 @@ userl_sub () {
     template="%8i %5Q %9P %14u %30j %8T %18S %.12l %.12L %.4C"
     [ "$nodelist" ] && template="$template %R"
     result=$(squeue $arg -S $sort -o "$template" | \
-        sed -r 's/([0-9])T([0-9])/\1\ \2/;s/:[0-9]*\ /\ \ \ \ /;s/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2\x1b[0m/')
+        sed -r 's/([0-9])T([0-9]*:[0-9]*):[0-9]*\ /\1\ \2\ \ \ /;s/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2\x1b[0m/')
     if [ "$project_number" = 1 ]
     then
         echo -e "$result"
