@@ -67,7 +67,7 @@ complete -F _jcd jcd
 
 
 # qcd:
-# Wrapper of cd to more to a job working directory, autocompletion of only job directories
+# Wrapper of cd to move to a job working directory, autocompletion of only job directories
 qcd () {
     if [ -d "${@: -1}" ]
     then
@@ -107,7 +107,6 @@ _qcd() {
             paths=$(squeue -u $USER -o "%Z" -h)
             ;;
     esac
-
 
 
     COMPREPLY=( $(compgen -W "${paths}" -- ${cur}) )
