@@ -30,6 +30,7 @@ compdef _jcd jcd
 qcd () {
     if [ -d "${@: -1}" ]
     then
+        echo "Moving to ${@: -1}"
         cd "${@: -1}"
     fi
 }
