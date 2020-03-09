@@ -84,7 +84,7 @@ Tools:
     alias qd='rsqueue --part --info --cost --maxit --progress-bar --residuals --tree --storage'
 
     # Cluster overview:
-    alias qa='rsqueue --all'
+    alias qa='rsqueue --all --progress-bar'
 
 
 Associated tools:
@@ -648,7 +648,7 @@ do
             params="$params -c"
             shift
             ;;
-        -d)
+        -d|--dir)
             shift
             jobid_d="$1"
             wdir_sub
