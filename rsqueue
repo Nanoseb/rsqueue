@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.2.1"
+version="2.2.3"
 
 # default parameters
 allparams="-u -t -p -i --progress-bar"
