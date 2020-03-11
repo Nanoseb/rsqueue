@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.2.3"
+version="2.2.4"
 
 # default parameters
 allparams="-u -t -p -i --progress-bar"
@@ -299,15 +299,15 @@ main_get_data () {
 
             if [ $((ETAsl - 90000 )) -lt 0 ]
             then
-                ETAtime=$(echo 0$(bc <<<"$ETAsl/3600"):0$(bc <<<"($ETAsl%3600)/60") | sed 's/:0\(..\)$/:\1/;s/^0\(..\):/\1:/')
+                ETAtime=$(sed 's/:0\(..\)$/:\1/;s/^0\(..\):/\1:/' <<< 0$(bc <<<"$ETAsl/3600"):0$(bc <<<"($ETAsl%3600)/60"))
             else
                 ETAtimes=$((ETAsl -90000))
                 ETAday=$(date -d @$ETAtimes +%j)
                 if [ "$ETAday" -gt 50 ]
                 then
-                    ETAtime=$(echo $(bc <<<"$ETAday/30") months $(bc <<<"$ETAday%30") days | sed 's/\ 0\ ....$//;s/\ 1\ ..../\ 1\ day/;s/^1\ ....../1\ month/')
+                    ETAtime=$(sed 's/\ 0\ ....$//;s/\ 1\ ..../\ 1\ day/;s/^1\ ....../1\ month/' <<< "$(bc <<<"$ETAday/30") months $(bc <<<"$ETAday%30") days")
                 else
-                    ETAtime=$(echo $ETAday days $(date -d @$ETAtimes +%H:%M) | sed 's/^0*//;s/^\ ....//;s/^1\ ..../1\ day/')
+                    ETAtime=$(sed 's/^0*//;s/^\ ....//;s/^1\ ..../1\ day/' <<< "$ETAday days $(date -d @$ETAtimes +%H:%M)")
                 fi
             fi
 
@@ -358,8 +358,6 @@ main_get_data () {
         else
             refresco=''
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
-            colorpd=""
-            [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
             [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco"'/!\'" stopfile present"
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
@@ -504,8 +502,9 @@ top_sub () {
         node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
         if [ "$cost" == 1 ]
         then
-            cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | sed 's/-/:/' |\
-                sed 's/^\([0-9]*:..:..\)\ /0:\1\ /' | sed 's/\ /:/' | awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+            cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | \
+                sed 's/-/:/;s/^\([0-9]*:..:..\)\ /0:\1\ /;s/\ /:/' | \
+                awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
         fi
         partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
         echo $user $nbjob $node $core $cpuhour_cost $partition
@@ -524,8 +523,9 @@ top_sub () {
             node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
             if [ "$cost" == 1 ]
             then
-                cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | sed 's/-/:/' |\
-                    sed 's/^\([0-9]*:..:..\)\ /0:\1\ /' | sed 's/\ /:/' | awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+                cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | \
+                    sed 's/-/:/;s/^\([0-9]*:..:..\)\ /0:\1\ /;s/\ /:/' | \
+                    awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
             fi
             partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
             echo "$user $nbjob pending $core $cpuhour_cost $partition"
@@ -589,8 +589,8 @@ stopcomputation_sub () {
 
 
 display-notif () {
-    pendingJobs=$(squeue -h -u $USER -o "%T" | grep PENDING | wc -l)
-    runningJobs=$(squeue -h -u $USER -o "%T" | grep RUNNING | wc -l)
+    pendingJobs=$(squeue -h -u $USER -o "%T" | grep -c PENDING)
+    runningJobs=$(squeue -h -u $USER -o "%T" | grep -c RUNNING)
 
     [[ -z "$pendingJobsOld" ]] && pendingJobsOld=$pendingJobs
     [[ -z "$runningJobsOld" ]] && runningJobsOld=$runningJobs
