@@ -1,24 +1,28 @@
 #!/bin/bash
 # Script used to monitor jobs and refresco running instances more particularly
-# For Marclus3 and Marclus4
+# For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.1.4"
+version="2.2.4"
 
 # default parameters
-allparams="-u -t -p -i"
+allparams="-u -t -p -i --progress-bar"
 defaultparams="-i"
 
 
-strg=1
+strg=0
 cost=0
-[[ "$(hostname | cut -c8)" == "4" ]] &&  cost=1
 
 maxit=0
-memfield=1
+memfield=0
 runonly=0
 project_number=1
-cpuhcost=0.05
+cpuhcost=0.03
+tree=0
+residuals_detail=0
+progress_bar=0
+progress_bar_length=10
+use_slurmtop=0
 
 MemFactor=4
 # n MCells => MemFactor*n GB RAM
@@ -33,33 +37,36 @@ fi
 man_sub () {
     echo -e "Usage: rsqueue [OPTIONS]
 Outputs:
-  -i                       Print detailed info about refresco job (default behaviour)
+  -i, --info              Print detailed info about refresco job (default behaviour)
                                A \"\e[31m!\e[0m\" will appear near the \"Iterations\" column if the calculation is not converging
                                The time left will turn red if the runtime specified in the jobfile is not long enough
-  -u ([users])             Print job info of all users (default) or from a comma separated list of users
-  -t / --top               Equivalent of slurmtop to summarize cluster load
-  -p                       Print info about partitions usage
-  -c                       Count the number of core used per user
-  -a / --all               Print (almost) everything (equivalent of: rsqueue $allparams)
+  -u, --user ([users])    Print job info of all users (default) or from a comma separated list of users
+  -t, --top               Equivalent of slurmtop to summarize cluster load
+  -p, --part              Print info about partitions usage
+  -c, --count             Count the number of core used per user
+  -a, --all               Print (almost) everything (equivalent of: rsqueue $allparams)
 
 Output tweaking:
-  -s                       Don't print the storage needed for simulations (speed up output)
-  -r                       Print only running jobs
-  --cost                   Print the current and final cost of the job 
-  --memory                 Hide the memory/core column
-  --maxit                  Print the maximum iteration number possible within the job time limit
-  --st                     Sort job list by start time
-  --pn                     Don't print the project number in the job name
-  --node                   Print the nodes being used in the -u output
+  -s, --storage           Print the storage needed for simulations (slows down the output)
+  -r, --run               Print only running jobs
+  --cost                  Print the current and final cost of the job 
+  --memory                Print an estimation of the memory/core based on the cell count
+  --maxit                 Print the maximum iteration number possible within the job time limit
+  --st                    Sort job list by start time
+  --pn                    Don't print the project number in the job name
+  --node                  Print the nodes being used in the -u output
+  --tree ([numdir]/all)   Print [numdir] number of subdirectories path in first column in a tree like form (default 2)
+  --residuals             Print a detailed view of the residuals for each running computation
+  --progress-bar          Print the computation progress graphically 
 
 Tools:
-  -d [jobID]               Print the working directory of the specified JobID
-  --stop [jobID]           Write a stopfile in the computation working directory to cleanly stop the simulation
-  -f / --follow ([time])   Refresh the your job list every [time]s (default being 15s)
-  --notif                  Display a desktop notification when a job state changes, needs X-forwarding and -f
-  --export-conf            Export a default configuration file in ~/.config/rsqueue.conf
-  -v / --version           Show version number
-  -h / --help              Print this help
+  -d, --dir [jobID]       Print the working directory of the specified JobID
+  --stop [jobID]          Write a stopfile in the computation working directory to cleanly stop the simulation
+  -f, --follow ([time])   Refresh the your job list every [time]s (default being 15s)
+  --notif                 Display a desktop notification when a job state changes, needs X-forwarding and -f
+  --export-conf           Export a default configuration file in ~/.config/rsqueue.conf
+  -v, --version           Show version number
+  -h, --help              Print this help
 
 
   In the main output (-i), all the estimated values (ETA, Time left, Storage, Cost, Max job It) are based on a linear extrapolation of the time the computation took since the start of the job.
@@ -68,6 +75,31 @@ Tools:
   The cost column is based on a price of $cpuhcost €/CPU h.
 
   A configuration file can be used to overwrite some default parameters, it must be placed in ~/.config/rsqueue.conf, a default configuration file is available via the command --export-conf. 
+
+  Suggestion of aliases to put in ~/.bashrc:
+    # Simple view:
+    alias q='rsqueue --part --info --cost --pn --maxit --progress-bar'
+
+    # Detailled view:
+    alias qd='rsqueue --part --info --cost --maxit --progress-bar --residuals --tree --storage'
+
+    # Cluster overview:
+    alias qa='rsqueue --all --progress-bar'
+
+
+Associated tools:
+(available when sourcing _rsqueue_completion.bash)
+
+Usage: qcd [path]
+    Wrapper of cd with autocompletion of jobs working directories only
+
+    -r, --running         Autocomplete only running jobs
+    -p, --pending         Autocomplete only pending jobs
+
+
+Usage: jcd [jobID]
+    cd to jobID working directory
+
 
 rsqueue is developed under MIT licence: feel free to contribute and give feedback!
 Get the latest version from: https://github.com/nanoseb/rsqueue"
@@ -117,6 +149,21 @@ runonly=$runonly
 
 # Print project number (1=true, 0=false)
 project_number=$project_number
+
+# Print tree like directories in 1st column (1=true, 0=false)
+tree=$tree
+
+# Print residuals detail (1=true, 0=false)
+residuals_detail=$residuals_detail
+
+# Print a progress bar (1=true, 0=false)
+progress_bar=$progress_bar
+
+# Length of the progress bar
+progress_bar_length=$progress_bar_length
+
+# Use slurmtop command output for -t when available (1=true, 0=false)
+use_slurmtop=$use_slurmtop 
 " > "$fileconf"
 
     echo "Configuration file exported to $fileconf"
@@ -132,9 +179,17 @@ gen_line() {
     printf "%${1}s\n" "" | sed 's/\ /─/g'
 }
 
+gen_progress_bar() {
+    progress=$(echo -e "$1 * $progress_bar_length / 100" | bc)
+    remaining=$((progress_bar_length-progress))
+    progress_char=$(printf "%${progress}s\n" "" | sed s/\ /"█"/g)
+    remaining_char=$(printf "%${remaining}s\n" "" | sed s/\ /─/g)
+    echo ${progress_char}${remaining_char} $1
+}
+
 main_get_data () {
     
-    echo "Directory;Job name;Job-ID;Cores;Iterations;Storage;%;Mem/Core;Cost;Start time;\e[0m;ETA;Time left;Max job It;"
+    echo "Directory;Directory;Job name;Job-ID;Cores;Iterations;Storage;%;Mem/Core;Cost;Start time;\e[0m;ETA;Time left;Max job It;"
 
     ETA24hsize=0
     ETAsizetotal=0
@@ -159,6 +214,10 @@ main_get_data () {
         jobout=$(grep -m 1 "^StdOut=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dir=$(grep -m 1 "^WorkDir=" <<<"$jobinfo" | sed 's/^[^=]*=//')
         dirp=$(sed 's/[/\.]*$//' <<<"$dir" | awk -F"/" '{print $NF}')
+        dirpfull=$(awk -v ndir=$numdir -F'/' 'function max(a, b) {return a > b ? a: b}
+        {out=""; for(i=max(NF-ndir+1,2);i<=NF;i++){out=out"/"$i}; print out}' <<<"$dir" | sed 's/^\/home\/[^\/]*\//~\//;s/^\///')
+
+
         # dirp=$(awk -F"/" '{print $NF}' <<<"$(cd "$dir" && pwd)")
 
         if [ "$project_number" = 1 ]
@@ -171,19 +230,26 @@ main_get_data () {
         [ -d "$dir" ] || continue
         controlspath="$dir"/controls.xml
         residualspath="$dir"/residuals.dat
+        counterspath="$dir"/counters.dat
 
 
         isrefresco="y"
-        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^# ReFRESCO " "$jobout" 2> /dev/null)
+        [ "$jobstate" = "RUNNING" ] && isrefresco=$(grep -m 1 "^\ *# ReFRESCO " "$jobout" 2> /dev/null)
 
 
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
         then
 
             controls=$(cat "$controlspath")
-            residuals=$( (head; tail) < "$residualspath")
+            # compatibility when counters are in residuals.dat file
+            if [ -e "$counterspath" ]
+            then
+                counters=$( (head; tail) < "$counterspath")
+            else
+                counters=$( (head; tail) < "$residualspath")
+            fi
 
-            reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed '/^.*<log>$/,$ d' | tac)'</log>'
+            reportgeneral='<log>'$(tac "$dir"/report_general.xml | sed 's/grid size/grid_size/g' | sed '/^.*<log>$/,$ d' | tac)'</log>'
             nCells=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/topology_info/topology_file/nIntCells/total' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
 
             if [[ "$nCells" ]]
@@ -199,7 +265,7 @@ main_get_data () {
             unsteady=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/unsteady' 2> /dev/null | grep -m 1 true)
             if [ "$unsteady" ]
             then
-                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $2}' | sed 's/[^0-9]//g')
+                currentstep=$(tail -n 1 <(echo "$counters") | awk '{print $2}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/timeLoop/maxTimesteps' | sed 's/[^0-9]//g;2p' -n)
 
                 initialtimestep=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/counters_info/start_time_step' 2> /dev/null| sed 's/[^0-9]//g;2p' -n)
@@ -207,14 +273,14 @@ main_get_data () {
                 [ ! "$initialtimestep" ] && initialtimestep=0
 
                 outermax=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
-                outercurrent=$(tail -n 1 <(echo "$residuals") | awk '{print $3}')
+                outercurrent=$(tail -n 1 <(echo "$counters") | awk '{print $3}')
                 [ "$outermax" = "$outercurrent" ] && outerwarn="!"
             else
-                currentstep=$(tail -n 1 <(echo "$residuals") | awk '{print $1}' | sed 's/[^0-9]//g')
+                currentstep=$(tail -n 1 <(echo "$counters") | awk '{print $1}' | sed 's/[^0-9]//g')
                 maxtimestep=$(xmllint --shell <(echo "$controls") <<<'cat //controls/outerLoop/maxIteration' | sed 's/[^0-9]//g;2p' -n)
             fi
 
-            initialtimestepf=$(head -n 3 <(echo "$residuals") | sed '3!d' | awk '{print $2}')
+            initialtimestepf=$(head -n 3 <(echo "$counters") | sed '3!d' | awk '{print $2}')
             [ -z "$initialtimestepf" ] && initialtimestepf=$initialtimestep
 
             [ -z "$currentstep" ] && currentstep=$(bc <<<"$initialtimestep +1")
@@ -233,15 +299,15 @@ main_get_data () {
 
             if [ $((ETAsl - 90000 )) -lt 0 ]
             then
-                ETAtime=$(echo 0$(bc <<<"$ETAsl/3600"):0$(bc <<<"($ETAsl%3600)/60") | sed 's/:0\(..\)$/:\1/;s/^0\(..\):/\1:/')
+                ETAtime=$(sed 's/:0\(..\)$/:\1/;s/^0\(..\):/\1:/' <<< 0$(bc <<<"$ETAsl/3600"):0$(bc <<<"($ETAsl%3600)/60"))
             else
                 ETAtimes=$((ETAsl -90000))
                 ETAday=$(date -d @$ETAtimes +%j)
                 if [ "$ETAday" -gt 50 ]
                 then
-                    ETAtime=$(echo $(bc <<<"$ETAday/30") months $(bc <<<"$ETAday%30") days | sed 's/\ 0\ ....$//;s/\ 1\ ..../\ 1\ day/;s/^1\ ....../1\ month/')
+                    ETAtime=$(sed 's/\ 0\ ....$//;s/\ 1\ ..../\ 1\ day/;s/^1\ ....../1\ month/' <<< "$(bc <<<"$ETAday/30") months $(bc <<<"$ETAday%30") days")
                 else
-                    ETAtime=$(echo $ETAday days $(date -d @$ETAtimes +%H:%M) | sed 's/^0*//;s/^\ ....//;s/^1\ ..../1\ day/')
+                    ETAtime=$(sed 's/^0*//;s/^\ ....//;s/^1\ ..../1\ day/' <<< "$ETAday days $(date -d @$ETAtimes +%H:%M)")
                 fi
             fi
 
@@ -249,6 +315,7 @@ main_get_data () {
             [ "$ETAepoch" ] && [ "$((startepoch + jobtimelimit))" -lt "$ETAepoch" ] && colortime='\e[31m'
 
             percent=$(bc <<<"100*($currentstep-$initialtimestepf)/($maxtimestep-$initialtimestepf)")
+            [ "$progress_bar" = "1" ] && percent="$(gen_progress_bar $percent)"
 
 
             costETA=$(bc <<<"$cpuhcost*$jobcore*($ETAepoch-$startepoch)/3600")
@@ -267,7 +334,7 @@ main_get_data () {
                 nowsizeh=$(convert_human $nowsize)
                 ETAsizetotal=$((nowsize + ETAsize + ETAsizetotal))
                 currentsizetotal=$((nowsize + currentsizetotal))
-                if [[ "$ETAday" -ge 1 ]]
+                if [[ "$((10#$ETAday))" -ge 1 ]]
                 then
                     ETA24hsize=$(bc <<<"$ETA24hsize + 86400*$nowsize*($currentstep-$initialtimestep)/(($currentstep-$initialtimestepf)*($nowepoch - $startepoch))")
                 else
@@ -275,19 +342,28 @@ main_get_data () {
                 fi
             fi
 
-            echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;"
+            if [ "$residuals_detail" = "1" ]
+            then
+                residuals=$( (head -n 3; tail -n 2) < "$residualspath")
+                ResidualOutput=@@$(get_residuals "$residuals" | sed ':a;N;$!ba;s/\n/@@/g')@@
+            else
+                ResidualOutput=""
+            fi
+
+
+            nprocs=$(xmllint --shell <(echo "$reportgeneral") <<<'cat //log/nprocs' 2> /dev/null | sed 's/[^0-9]//g;2p' -n)
+            [[ "$nprocs" ]] && [[ "$nprocs" != "$jobcore" ]] && jobcore="$nprocs/$jobcore"
+            echo "$dirpfull;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$currentstep/$maxtimestep $outerwarn;$nowsizeh/$ETAsizeh;$percent%;$mem_s;$costnow/$costETA €;$jobdate $jobtime;$colortime;$ETAdate;$ETAtime;$maxitString;$ResidualOutput"
 
         else
             refresco=''
             [ ! "$isrefresco" ] && refresco="NO ReFRESCO"
-            colorpd=""
-            [ "$jobstate" = "PENDING" ] && colorpd="\e[2m"
             [ "$jobstate" = "PENDING" ] && [ -f "$dir"/stopfile ] && refresco="$refresco"'/!\'" stopfile present"
 
             if [ "$runonly" = "0" ] || [ "$jobstate" = "RUNNING" ]
             then
                 reason=$(grep -m 1 "^Reason=" <<<"$jobinfo" | sed 's/^[^=]*=//')
-                echo "${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
+                echo "$dirpfull;${dirp:0:15};${jobname_short:0:15};$jobid;$jobcore;$jobstate ($reason);;;;;$jobdate $jobtime;\e[31m;$refresco;"
             fi
         fi
     done <<< "$(squeue -S $sort -h -u $USER -o "%T %i")"
@@ -302,42 +378,83 @@ main_sub () {
     storage=$(sed -n '/^$/,$p' <<<"$data")
     data=$(sed '/^$/,+3d' <<<"$data")
 
-    [ "$debug" ] && data="$data"$'\n'"$(seq 15 | tr "\n" ";")"
+    [ "$debug" ] && data="$data"$'\n'"$(seq 16 | tr "\n" ";")"
 
     # remove maxit
-    [ "$maxit" != 1 ] && data=$(sed 's/[^;]*;//14' <<<"$data")
+    [ "$maxit" != 1 ] && data=$(sed 's/[^;]*;//15' <<<"$data")
 
     # remove cost
-    [ "$cost" != 1 ] && data=$(sed 's/[^;]*;//9' <<<"$data")
+    [ "$cost" != 1 ] && data=$(sed 's/[^;]*;//10' <<<"$data")
 
     # remove memory 
-    [ "$memfield" != 1 ] && data=$(sed 's/[^;]*;//8' <<<"$data")
+    [ "$memfield" != 1 ] && data=$(sed 's/[^;]*;//9' <<<"$data")
 
     # remove storage
-    [ "$strg" != 1 ] && data=$(sed 's/[^;]*;//6' <<<"$data")
+    [ "$strg" != 1 ] && data=$(sed 's/[^;]*;//7' <<<"$data")
 
+    # remove full dir
+    [ "$tree" != 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
+    [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//2' <<<"$data")
+
+    [ "$tree" == 1 ] && [ "$residuals_detail" != 1 ] && [ "$numdir" == 2 ] && data=$(gen_tree "$data")
 
     echo -e "$data" |\
         sed 's/;;/; ;/g;s/;;/; ;/g' |\
         column -t -s ';' |\
+        sed 's/@@/\n/g' |\
         sed -r 's/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2/;s/$/\x1b[0m/' |\
         sed 's/\(.\!.\)/\x1b[31m\1\x1b[0m/'
 
     echo "$storage"
 }
 
+get_residuals () {
+
+    header=$(sed '2!d;s/" "/\n/g' <(echo "$1") | grep 'Linf_' | sed 's/"//;s/Linf_/ ;/')
+    nb=$(wc -l <<<"$header")
+    residualLinf=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-nb+1;i<=NF;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
+    residualL2=$(tail -n 1  <(echo "$1") | awk -v nb=$nb '{for(i=NF-2*nb+1;i<=NF-nb;i++) printf $i"\n"; print ""}') # | sed 's/\..*E/E/')
+
+    paste <(echo '  └───> L2' "$header") \
+          <(echo "$residualL2") \
+          <(echo '  ──> Linf' "$header") \
+          <(echo "$residualLinf")  --delimiters ';' |\
+          column -t -s ';'
+
+}
+
+
+gen_tree () {
+    data="$1"
+
+    head -n 1 <<<"$data"
+    content=$(tail -n +2 <<<"$data" | sort -n)
+    prevdir=""
+    echo -e "$content" | while read line
+    do
+        currentdir=$(awk -F'/' '{print $1}' <<<"$line")
+        if [[ "$currentdir" == "$prevdir" ]]
+        then
+            newdir=$(sed 's/./ /g' <<<"$currentdir")
+            sed "s/^$currentdir/$newdir/" <<<"$line"
+        else
+            prevdir="$currentdir"
+            echo -e "$line"
+        fi
+    done
+
+}
 
 storage_sub () {
     echo
     echo Total disk space needed: $(convert_human $ETAsizetotal)
-    # [ "$marclus" = 4 ] && echo Current disk usage: $(convert_human $currentsizetotal)
     echo Disk usage growth rate: $(convert_human $ETA24hsize)/day
 
 }
 
 
 count_sub () {
-    echo -e "\e[34m\e[4mUsed CPUs per user:\e[0m"
+    echo -e "User Nb_CPU"
     list=$(squeue -t R -h -o "%u %C")
     users_c=$(awk '{print $1}' <<<"$list" | sort | uniq)
     used_core=$(awk '{s+=$2} END {print s}' <<<"$list")
@@ -347,11 +464,11 @@ count_sub () {
     while read user
     do
         nb=$(grep ^$user\  <<<"$list" | awk '{s+=$2} END {print s}')
-        if [ "$nb" -gt "$avg" ]
+        if [[ "$nb" -gt "$avg" ]]
         then
-            echo -e "$user: \e[31m$nb\e[0m"
+            echo -e "$user \e[31m$nb\e[0m"
         else
-            echo -e "$user: $nb"
+            echo -e "$user $nb"
         fi
     done <<<"$users_c" | column -t
 }
@@ -359,23 +476,44 @@ count_sub () {
 
 top_sub () {
 
-    list=$(squeue -t R -h -o "%u %D %C %P")
+    if [[ "$use_slurmtop" == 1 && $(command -v slurmtop) ]]
+    then
+        echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
+        slurmtop -f - -i 1 | tail -n +7 | sed '/^$/d'
+        exit 0
+    else
+        if [ "$cost" == 1 ]
+        then
+            sort_column=5
+            echo "User Nb_Jobs Nb_Nodes Nb_CPU Cost Partitions"
+        else
+            cpuhour_cost=""
+            sort_column=4
+            echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
+        fi
+    fi
+    list=$(squeue -t R -h -o "%u %D %C %P %l")
     users_t=$(awk '{print $1}' <<<"$list" | sort -u)
-    echo "User Nb_Jobs Nb_Nodes Nb_CPU Partitions"
     while read user
     do
         userlist=$(grep ^$user\  <<<"$list")
         nbjob=$(wc -l <<<"$userlist")
         core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
         node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+        if [ "$cost" == 1 ]
+        then
+            cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | \
+                sed 's/-/:/;s/^\([0-9]*:..:..\)\ /0:\1\ /;s/\ /:/' | \
+                awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+        fi
         partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
-        echo $user $nbjob $node $core $partition
+        echo $user $nbjob $node $core $cpuhour_cost $partition
 
-    done <<<"$users_t" | sort -n -k 4 -r
+    done <<<"$users_t" | sort -n -k $sort_column -r
 
     if [ "$runonly" = "0" ]
     then
-        list=$(squeue -t PD -h -o "%u %D %C %P")
+        list=$(squeue -t PD -h -o "%u %D %C %P %l")
         users_t=$(awk '{print $1}' <<<"$list" | sort -u)
         while read user
         do
@@ -383,10 +521,16 @@ top_sub () {
             nbjob=$(wc -l <<<"$userlist")
             core=$(awk '{s+=$3} END {print s}' <<<"$userlist")
             node=$(awk '{s+=$2} END {print s}' <<<"$userlist")
+            if [ "$cost" == 1 ]
+            then
+                cpuhour_cost=$(awk '{print $5 " " $3}' <<<"$userlist" | \
+                    sed 's/-/:/;s/^\([0-9]*:..:..\)\ /0:\1\ /;s/\ /:/' | \
+                    awk -F":" -v cost="$cpuhcost" '{s+=cost*($4+$3*60+$2*3600+$1*86400)*$5/3600} END {print s}')
+            fi
             partition=$(awk '{print $4}' <<<"$userlist" | sort -u | tr '\n' ',' | sed 's/,$//')
-            echo "$user $nbjob pending $core $partition"
+            echo "$user $nbjob pending $core $cpuhour_cost $partition"
 
-        done <<<"$users_t" | sort -n -k 4 -r
+        done <<<"$users_t" | sort -n -k $sort_column -r
     fi
 
 }
@@ -396,9 +540,9 @@ wdir_sub () {
     if [ -z $jobid_d ]
     then
         jobid_d=$(squeue -S $sort -h -u $USER -o "%i" | head -n 1)
-        [ -z $jobid_d ] && echo "No jobID" && exit 1
+        [ -z $jobid_d ] && echo "No jobID" >&2 && exit 1
     fi
-    dir=$(scontrol show job $jobid_d | grep -m 1 "^\ *WorkDir=" | sed 's/^[^=]*=//')
+    dir=$(squeue -o "%i %Z" | grep -m 1 "^${jobid_d%%-*}\ "| sed 's/^[^\ ]*\ //')
     [ -z "$dir" ] && echo . && exit 1
     echo $dir
 }
@@ -411,7 +555,7 @@ userl_sub () {
     template="%8i %5Q %9P %14u %30j %8T %18S %.12l %.12L %.4C"
     [ "$nodelist" ] && template="$template %R"
     result=$(squeue $arg -S $sort -o "$template" | \
-        sed -r 's/([0-9])T([0-9])/\1\ \2/;s/:[0-9]*\ /\ \ \ \ /;s/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2\x1b[0m/')
+        sed -r 's/([0-9])T([0-9]*:[0-9]*):[0-9]*\ /\1\ \2\ \ \ /;s/^(.*)PENDING(.*)$/\x1b[2m\1PENDING\2\x1b[0m/')
     if [ "$project_number" = 1 ]
     then
         echo -e "$result"
@@ -422,9 +566,7 @@ userl_sub () {
 
 
 partition_sub () {
-#    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "Partition=%-21s Used=%-5d Total=%-5d Error=\033[0;%dm%-5d\033[0m Available=\033[0;%dm%-5d\033[0m Usage=%3d % \n",
-#    "\33[4;34m" $1 "\33[0m",$2,$5,0,$4,32,$3, ($2*100)/($5-$4-1e-8)}'
-    echo "Partition,Total,Used,Error,Available,Usage"
+    echo "Partition,Total,Used,Down,Available,Usage"
     sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
      $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
 }
@@ -447,8 +589,8 @@ stopcomputation_sub () {
 
 
 display-notif () {
-    pendingJobs=$(squeue -h -u $USER -o "%T" | grep PENDING | wc -l)
-    runningJobs=$(squeue -h -u $USER -o "%T" | grep RUNNING | wc -l)
+    pendingJobs=$(squeue -h -u $USER -o "%T" | grep -c PENDING)
+    runningJobs=$(squeue -h -u $USER -o "%T" | grep -c RUNNING)
 
     [[ -z "$pendingJobsOld" ]] && pendingJobsOld=$pendingJobs
     [[ -z "$runningJobsOld" ]] && runningJobsOld=$runningJobs
@@ -484,34 +626,35 @@ erase () {
 }
 
 sort="-T,u,i"
+numdir=1
 
 
 while [[ $# -gt 0 ]]
 do
     case $1 in
-        -i)
+        -i|--info)
             params="$params -i"
             shift
             ;;
-        -s)
-            strg=0
+        -s|--storage)
+            strg=1
             shift
             ;;
-        -r)
+        -r|--run)
             runonly=1
             shift
             ;;
-        -c)
+        -c|--count)
             params="$params -c"
             shift
             ;;
-        -d)
+        -d|--dir)
             shift
             jobid_d="$1"
             wdir_sub
             exit 0
             ;;
-        -u)
+        -u|--user)
             if [ -z "$2" ] || [ "${2:0:1}" = "-" ]
             then
                 users=""
@@ -538,7 +681,7 @@ do
             sort="S,-Q"
             shift
             ;;
-        -p)
+        -p|--part)
             params="$params -p"
             shift
             ;;
@@ -555,7 +698,32 @@ do
             shift
             ;;
         --memory)
-            memfield=0
+            memfield=1
+            shift
+            ;;
+        --tree)
+            if [ -z "$2" ] || [ "${2:0:1}" = "-" ]
+            then
+                numdir=2
+            else
+                shift
+                if [ "$1" = "all" ]
+                then
+                    numdir=100
+                else
+                    numdir="$1"
+                fi
+            fi
+
+            tree=1
+            shift
+            ;;
+        --residuals|--portuguese-language)
+            residuals_detail=1
+            shift
+            ;;
+        --progress-bar)
+            progress_bar=1
             shift
             ;;
         -f|--follow)
@@ -626,7 +794,7 @@ do
     case $param in
         -i) [[ "$follow" ]] || printWHeader "$(main_sub)"
             ;;
-        -c) count_sub
+        -c) printWHeader "$(count_sub | column -t | sed 's/_/ /g')"
             ;;
         -d) wdir_sub
             ;;
