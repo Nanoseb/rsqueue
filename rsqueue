@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.2.4"
+version="2.2.5"
 
 # default parameters
 allparams="-u -t -p -i --progress-bar"
@@ -567,7 +567,7 @@ userl_sub () {
 
 partition_sub () {
     echo "Partition,Total,Used,Down,Available,Usage"
-    sinfo -h -o "%R %C" | sed 's/\//\ /g' | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
+    sinfo -S "%C" -h -o "%R %C" | sed 's/\//\ /g' | sort -k5 -n -r | awk '{printf "%s,%d,%d,%d,%d,%d % \n",
      $1,$5,$2,$4,$3, ($2*100)/($5-$4-1e-8)}'
 }
 
