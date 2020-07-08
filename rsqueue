@@ -398,7 +398,7 @@ main_sub () {
     [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//3' <<<"$data")
 
     # remove username
-    [ "$godmode" != 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
+    [ "$godmode" != 1 ] || [ "$tree" == 1 ] && data=$(sed 's/[^;]*;//1' <<<"$data")
 
     [ "$tree" == 1 ] && [ "$residuals_detail" != 1 ] && [ "$numdir" == 2 ] && data=$(gen_tree "$data")
 
