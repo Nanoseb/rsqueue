@@ -3,7 +3,7 @@
 # For Marclus3, Marclus4, Marclus5 or any other slurm based cluster
 # by Sebastien Lemaire <sebastien.lemaire@soton.ac.uk>
 # license MIT
-version="2.2.7"
+version="2.2.8"
 
 # default parameters
 allparams="-u -t -p -i --progress-bar"
@@ -241,7 +241,7 @@ main_get_data () {
         if [ "$jobstate" = "RUNNING" ] && [ -e "$controlspath" ] && [ -e "$residualspath" ] && [ "$isrefresco" ]
         then
 
-            controls=$(cat "$controlspath")
+            controls=$(tail -n +$(grep -xn "<controls>" "$controlspath" | tail -n 1 | cut -d: -f1) "$controlspath")
             # compatibility when counters are in residuals.dat file
             if [ -e "$counterspath" ]
             then
